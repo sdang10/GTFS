@@ -1,40 +1,55 @@
+---------------------------------------------------------------------------
+SELECT * FROM gtfs.v_transitland_feed_info;
+---------------------------------------------------------------------------
+
+
+DROP TABLE gtfs_test.transitland_stop_times; 
+DROP TABLE gtfs_test.transitland_trips ;
+DROP TABLE gtfs_test.transitland_fare_rules ;
+DROP TABLE gtfs_test.transitland_fare_attributes;
+DROP TABLE gtfs_test.transitland_shapes;
+DROP TABLE gtfs_test.transitland_calendar_dates;
+DROP TABLE gtfs_test.transitland_calendar;
+DROP TABLE gtfs_test.transitland_routes;
+DROP TABLE gtfs_test.transitland_stops ;
+DROP TABLE gtfs_test.transitland_agency;
+
+
+
+
 CREATE TABLE gtfs_test.transitland_agency (
-	agency_id INT2 PRIMARY KEY,
+	agency_id TEXT PRIMARY KEY,
 	agency_name TEXT,
 	agency_url TEXT,
-	-- onestop_id TEXT
 	agency_timezone TEXT, 
 	agency_lang TEXT,
 	agency_phone TEXT,
 	agency_fare_url TEXT
 );
 
-SELECT * FROM gtfs_test.transitland_agency
-
 
 CREATE TABLE gtfs_test.transitland_stops (
-	stop_id INT PRIMARY KEY,
-	-- agency_id INT2 REFERENCES gtfs_test.transitland_agencies(agency_id),
+	stop_id TEXT PRIMARY KEY,
 	stop_code TEXT,
 	stop_name TEXT,
 	stop_desc TEXT,
 	stop_lat TEXT,
 	stop_lon TEXT,
-	zone_id INT,
+	zone_id TEXT,
 	stop_url TEXT,
-	location_type INT,
-	parent_station INT REFERENCES gtfs_test.transitland_stops(stop_id),
+	location_type TEXT,
+	parent_station TEXT,
 	stop_timezone TEXT
 );
 
 
 CREATE TABLE gtfs_test.transitland_routes (
-	route_id INT PRIMARY KEY,
-	agency_id INT2 REFERENCES gtfs_test.transitland_agency(agency_id),
+	route_id TEXT PRIMARY KEY,
+	agency_id TEXT,
 	route_short_name TEXT,
 	route_long_name TEXT,
 	route_desc TEXT,
-	route_type INT,
+	route_type TEXT,
 	route_url TEXT,
 	route_color TEXT,
 	route_text_color TEXT
@@ -42,124 +57,95 @@ CREATE TABLE gtfs_test.transitland_routes (
 
 
 CREATE TABLE gtfs_test.transitland_calendar (
-	service_id INT PRIMARY KEY,
-	monday INT,
-	tuesday INT,
-	wednesday INT,
-	thursday INT,
-	friday INT,
-	saturday INT,
-	sunday INT,
-	start_date TEXT,
-	end_date TEXT
+	service_id TEXT PRIMARY KEY,
+	monday TEXT,
+	tuesday TEXT,
+	wednesday TEXT,
+	thursday TEXT,
+	friday TEXT,
+	saturday TEXT,
+	sunday TEXT,
+	start_date DATE,
+	end_date DATE
 );
-
-SELECT * FROM gtfs_test.transitland_calendar
 
 
 CREATE TABLE gtfs_test.transitland_calendar_dates (
-	service_id INT REFERENCES gtfs_test.transitland_calendar(service_id),
+	service_id TEXT,
 	date TEXT,
-	exception_type INT
+	exception_type TEXT
 );
-
-SELECT * FROM gtfs_test.transitland_calendar_dates
 
 
 CREATE TABLE gtfs_test.transitland_shapes (
-	shape_id INT PRIMARY KEY,
+	shape_id TEXT,
 	shape_pt_lat TEXT,
 	shape_pt_lon TEXT,
-	shape_pt_sequence INT,
-	shape_dist_traveled FLOAT
+	shape_pt_sequence TEXT,
+	shape_dist_traveled TEXT
 );
 
 
 CREATE TABLE gtfs_test.transitland_fare_attributes (
-	fare_id INT PRIMARY KEY,
-	agency_id INT REFERENCES gtfs_test.transitland_agency(agency_id),
-	fare_period_id TEXT, -- ?????
-	price FLOAT,
+	fare_id TEXT PRIMARY KEY,
+	agency_id TEXT,
+	fare_period_id TEXT,
+	price TEXT,
 	descriptions TEXT,
 	currency_type TEXT,
-	payment_method INT,
-	transfers INT,
-	transfer_duration INT
+	payment_method TEXT,
+	transfers TEXT,
+	transfer_duration TEXT
 );
 
 
 CREATE TABLE gtfs_test.transitland_fare_rules (
-	fare_id INT REFERENCES gtfs_test.transitland_fare_attributes(fare_id),
-	route_id INT REFERENCES gtfs_test.transitland_routes(route_id),
-	origin_id INT, --REFERENCES gtfs_test.transitland_stops(zone_id), ??
-	destination_id INT, --REFERENCES gtfs_test.transitland_stops(zone_id), ??
-	contains_id INT --REFERENCES gtfs_test.transitland_stops(zone_id) ??
+	fare_id TEXT,
+	route_id TEXT,
+	origin_id TEXT,
+	destination_id TEXT,
+	contains_id TEXT
 );
 
 
 CREATE TABLE gtfs_test.transitland_trips (
-	route_id INT REFERENCES gtfs_test.transitland_routes(route_id),
-	service_id INT REFERENCES gtfs_test.transitland_calendar(service_id),
-	trip_id INT PRIMARY KEY,
+	route_id TEXT,
+	service_id TEXT,
+	trip_id TEXT PRIMARY KEY,
 	trip_headsign TEXT,
 	trip_short_name TEXT,
-	direction_id INT,
-	block_id INT,
-	shape_id INT REFERENCES gtfs_test.transitland_shapes(shape_id),
-	peak_flag TEXT, -- ????
-	fare_id INT REFERENCES gtfs_test.transitland_fare_attributes(fare_id)
+	direction_id TEXT,
+	block_id TEXT,
+	shape_id TEXT,
+	peak_flag TEXT,
+	fare_id TEXT
 );
 
 
 CREATE TABLE gtfs_test.transitland_stop_times (
-	trip_id INT REFERENCES gtfs_test.transitland_trips(trip_id),
+	trip_id TEXT,
 	arrival_time TEXT,
 	departure_time TEXT,
-	stop_id INT REFERENCES gtfs_test.transitland_stops(stop_id),
-	stop_sequence INT,
+	stop_id TEXT,
+	stop_sequence TEXT,
 	stop_headsign TEXT,
-	pickup_type INT,
-	drop_off_type INT,
-	shape_dist_traveled FLOAT,
-	timepoint INT
+	pickup_type TEXT,
+	drop_off_type TEXT,
+	shape_dist_traveled TEXT,
+	timepoTEXT TEXT
 );
 
-SELECT * FROM gtfs.v_transitland_feed_info;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-DROP TABLE gtfs_test.transitland_test
-
-CREATE TABLE gtfs_test.transitland_test(
-	agency_id INT2 PRIMARY KEY,
-	agency_name TEXT,
-	agency_url TEXT,
-	-- onestop_id TEXT
-	agency_timezone TEXT, 
-	agency_lang TEXT,
-	agency_phone TEXT,
-	agency_fare_url TEXT
-);
-
-SELECT * FROM gtfs_test.transitland_test
-
-
-
+SELECT * FROM gtfs_test.transitland_agency
+SELECT * FROM gtfs_test.transitland_stops
+SELECT * FROM gtfs_test.transitland_routes
+SELECT * FROM gtfs_test.transitland_calendar
+SELECT * FROM gtfs_test.transitland_calendar_dates
+SELECT * FROM gtfs_test.transitland_shapes
+SELECT * FROM gtfs_test.transitland_fare_attributes
+SELECT * FROM gtfs_test.transitland_fare_rules
+SELECT * FROM gtfs_test.transitland_trips
+SELECT * FROM gtfs_test.transitland_stop_times
 
 
 
