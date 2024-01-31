@@ -8,6 +8,10 @@ import zipfile
 import argparse
 import sys
 from urllib.parse import urljoin
+import numpy as np
+import pandas as pd
+from sqlalchemy import create_engine
+
 
 # external module imports
 import requests
@@ -85,19 +89,21 @@ def main():
 
 
     # local variables
-    # db_name = cfgutil.get_item('db_postgres','db_name')
-    # username = cfgutil.get_item('db_postgres','username')
-    # password = cfgutil.get_item('db_postgres','password')
-    # host = cfgutil.get_item('db_postgres','host')
-    # port = cfgutil.get_item('db_postgres','port')
+    pg_username = cfgutil.get_item('db_postgres', 'username')
+    pg_password = cfgutil.get_item('db_postgres','password')
+    pg_host = cfgutil.get_item('db_postgres','host')
+    pg_port = cfgutil.get_item('db_postgres','port')
+    pg_db_name = cfgutil.get_item('db_postgres','db_name')
     pg_schema = cfgutil.get_item('db_postgres','schema_name')
     # transitland api info
     api_key = cfgutil.get_item('feed_info','api_key')
     api_url = cfgutil.get_item('feed_info','api_endpoint')
     feed_url = api_url + cfgutil.get_item('feed_info','feed_list')
     dl_url = api_url + cfgutil.get_item('feed_info','feed_download')
+    # transitland allowables
+    allowed_files = cfgutil.get_item('data_tracking', 'allowed_files')
     # file path
-    file_path = cfgutil.get_item('feed_info','file_path')
+    zip_file_path = cfgutil.get_item('feed_info','file_path')
     #dt_fmt = '%Y-%m-%d'
     #orca_start = dt.datetime.strptime('2019-01-01',dt_fmt)
 
@@ -136,7 +142,7 @@ def main():
         for a in pgdb.fetchall('SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info'):
 
             # initialize agency file path with onestop_id (still missing feed_sha1)
-            afp = file_path.replace('{feed_onestop_id}', a[1])
+            afp = zip_file_path.replace('{feed_onestop_id}', a[1])
 
             # get list of feeds from transitland after highest feed in data
             r = requests.get(feed_url + a[1], params={'api_key': api_key})
@@ -144,11 +150,6 @@ def main():
                 # get feeds and reverse list to work in chronological order
                 feeds = r.json()['feeds'][0]['feed_versions']
                 feeds.reverse()
-
-            # feed_response = requests.get(agency_feeds.replace('{agency}', agency).replace('{api_key}', api_key))
-            # feed_response.raise_for_status()
-            # feeds = feed_response.json()['feeds'][0]['feed_versions']
-            # feeds.reverse()
 
                 for f in feeds:
 
@@ -189,64 +190,83 @@ def main():
                             # Iterate through each file in the folder
 
                             for file in file_list:
-                            
-                                file_path = os.path.join(extract_path, file)
-                                # Check if it's a file (not a subfolder)
+                                if file not in allowed_files:
 
-                                if os.path.isfile(file_path):
+                                    next(file)
+
+                                else: 
+                            
+                                    file_path = os.path.join(extract_path, file)
+                                    # Check if it's a file (not a subfolder)
+
+                                    # if os.path.isfile(file_path):
 
                                     print(f"Importing file: {file}")
                                     # Split the filename and extension
                                     filename, file_extension = os.path.splitext(file)
                                     # Save the filename without the extension as a new variable
                                     file_name = filename
-                                
-                                    with open(file_path, 'r') as file:
+                                    table_name = f"transitland_{file_name}"
+                                    df = pd.read_csv(file_path)
+                                    df = df.astype(str)
 
-                                        # Establish a connection to the PostgreSQL database
-                                        # try:
+                                    # connect to Postgres db
+                                    conn_string = f'postgresql://{pg_username}:{pg_password}@{pg_host}:{pg_port}/{pg_db_name}?options=-csearch_path={pg_schema}'
+                                    db = create_engine(conn_string) 
+                                    conn = db.connect() 
+                                    
 
-                                            
-                                        #    connection = psycopg2.connect(
-                                        #         dbname=db_name,
-                                        #         user=username,
-                                        #         password=password,
-                                        #         host=host,
-                                        #         port=port
-                                        #     )
-                                            
+                                    # Get column names from the DataFrame
+                                    df_columns = df.columns.tolist()
 
-                                            # Create a cursor object to interact with the database
-                                            # cursor = pgdb.cursor()
+                                    # Get column names from the SQL table
+                                    sql_columns = pd.read_sql(f"SELECT * FROM {table_name} LIMIT 0", conn).columns.tolist()
 
+                                    # Find columns in DataFrame that are not present in SQL table
+                                    df_extra_columns = set(df_columns) - set(sql_columns)
+                                    # Find columns in SQL table that are not present in DataFrame
+                                    sql_extra_columns = set(sql_columns) - set(df_columns)
 
+                                    # Remove extra columns from DataFrame
+                                    if sql_extra_columns:
 
+                                        print("Not including the following columns from the DataFrame as they are not present in the SQL table:")
+                                        print(sql_extra_columns)
 
-                                            # Set schema
-                                            # cursor.execute(f"SET search_path TO {pg_schema}")
-                                            
-                                            
-                                            # Define the PostgreSQL table name based on the file name
-                                            table_name = f"transitland_{file_name}"
-                                            next(file)
-                                            pgdb.cursor().copy_expert(f"COPY {table_name} FROM STDIN (format csv, delimiter ',', quote '\"')", file)
-                                            # Commit the changes
-                                            pgdb.commit()
-                                            # Close the cursor and connection
-                                            # cursor.close()
-                                            pgdb.close()
+                                        for index, row in df.iterrows():
+                                            for column in sql_extra_columns:
 
-                                        # except psycopg2.Error as e:
-                                        #     print(f"Error connecting to the PostgreSQL database: {e}")
+                                                file_id = f['id']  # Example value, replace with actual file_id
+                                                column_name = column
+                                                value = row[column]
+                                                # Insert values into gtfs_extra_attributes table
+                                                insert_query = f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ({file_id}, '{file_name}', '{column_name}', '{value}')"
+                                                conn.execute(insert_query)
 
-                                        # finally:
-                                        #     # Close the cursor and connection to release resources
-                                        #     if cursor:
-                                        #         cursor.close()
+                                        df.drop(columns=sql_extra_columns, inplace=True)
 
-                                        #     if connection:
-                                        #         connection.close()
-                                        #         print(f'Database Connection Closed')
+                                    else:
+
+                                        print("No extra columns found in the DataFrame.")
+
+                                    if df_extra_columns:
+
+                                        print("The following columns are missing from the DataFrame and will be defined with the default value")
+                                        print(df_extra_columns)
+
+                                        for column in df_extra_columns:
+
+                                            default_value = 'NA'  # Adjust the default value based on your requirements
+                                            df[column] = default_value
+                                        print(df)
+
+                                    # imort dataframe data into postgressql
+                                    df.to_sql(table_name, con=conn, if_exists='append', index=False) 
+                                    print(pd.read_sql(f"SELECT * FROM {table_name}", conn))
+
+                                    # Close the connection after interacting with the database
+                                    conn.close()
+
 
     except Exception as e:
         #import pdb
