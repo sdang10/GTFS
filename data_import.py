@@ -10,7 +10,7 @@ import sys
 from urllib.parse import urljoin
 import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 
 # external module imports
@@ -228,33 +228,33 @@ def main():
                                     sql_extra_columns = set(sql_columns) - set(df_columns)
 
                                     # Remove extra columns from DataFrame
-                                    if sql_extra_columns:
+                                    if df_extra_columns:
 
                                         print("Not including the following columns from the DataFrame as they are not present in the SQL table:")
-                                        print(sql_extra_columns)
+                                        print(df_extra_columns)
 
                                         for index, row in df.iterrows():
-                                            for column in sql_extra_columns:
-
-                                                file_id = f['id']  # Example value, replace with actual file_id
-                                                column_name = column
+                                            for column in df_extra_columns:
                                                 value = row[column]
-                                                # Insert values into gtfs_extra_attributes table
-                                                insert_query = f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ({file_id}, '{file_name}', '{column_name}', '{value}')"
-                                                conn.execute(insert_query)
+                                                if value is not None and value != '':
+                                                    file_id = f['id']  # Example value, replace with actual file_id
+                                                    column_name = column
+                                                    # Insert values into gtfs_extra_attributes table
+                                                    insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{value}')")
+                                                    conn.execute(insert_query)
 
-                                        df.drop(columns=sql_extra_columns, inplace=True)
+                                        df.drop(columns=df_extra_columns, inplace=True)
 
                                     else:
 
                                         print("No extra columns found in the DataFrame.")
 
-                                    if df_extra_columns:
+                                    if sql_extra_columns:
 
                                         print("The following columns are missing from the DataFrame and will be defined with the default value")
-                                        print(df_extra_columns)
+                                        print(sql_extra_columns)
 
-                                        for column in df_extra_columns:
+                                        for column in sql_extra_columns:
 
                                             default_value = 'NA'  # Adjust the default value based on your requirements
                                             df[column] = default_value
@@ -264,6 +264,8 @@ def main():
                                     df.to_sql(table_name, con=conn, if_exists='append', index=False) 
                                     print(pd.read_sql(f"SELECT * FROM {table_name}", conn))
 
+                                    # commit the changes made to the database
+                                    conn.commit()
                                     # Close the connection after interacting with the database
                                     conn.close()
 
