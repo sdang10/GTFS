@@ -11,7 +11,8 @@ from urllib.parse import urljoin
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
-
+import json
+import shutil
 
 # external module imports
 import requests
@@ -100,10 +101,13 @@ def main():
     api_url = cfgutil.get_item('feed_info','api_endpoint')
     feed_url = api_url + cfgutil.get_item('feed_info','feed_list')
     dl_url = api_url + cfgutil.get_item('feed_info','feed_download')
+    # file metadata variables
+    file_data_variables = cfgutil.get_item('data_tracking', 'gtfs_file_data_variables')
     # transitland allowables
     allowed_files = cfgutil.get_item('data_tracking', 'allowed_files')
     # file path
     zip_file_path = cfgutil.get_item('feed_info','file_path')
+    archive_file_path = '/shane_gtfs_static_archive/'
     #dt_fmt = '%Y-%m-%d'
     #orca_start = dt.datetime.strptime('2019-01-01',dt_fmt)
 
@@ -150,6 +154,7 @@ def main():
                 # get feeds and reverse list to work in chronological order
                 feeds = r.json()['feeds'][0]['feed_versions']
                 feeds.reverse()
+                print(feeds)
 
                 for f in feeds:
 
@@ -165,6 +170,12 @@ def main():
 
                     # if fetched_at_date >= july_1_2023:
 
+
+
+                    # for key in f:
+                        
+                    #     value = f[key]
+                    #     pgdb.query(f'INSERT INTO gtfs_files ({key}) VALUES ({value})')
 
                     # check if feed id > latest_id (to only import newer feeds)
                     if f['id'] > a[2]:
@@ -184,6 +195,17 @@ def main():
                         
                             except Exception as e:
                                 print(f"Error unzipping file: {e}")
+
+                            # Generate SQL query dynamically
+                            columns = ', '.join(f.keys())
+                            print(columns)
+                            values = ', '.join([f"'{value}'" for value in f.values()])
+                            print(values)
+
+                            sql_query = f'INSERT INTO gtfs_files ({columns}) VALUES ({values})'
+
+                            # Execute the SQL query using your database library
+                            pgdb.query(sql_query)
 
                             # List all files in the folder
                             file_list = os.listdir(extract_path)
@@ -268,6 +290,8 @@ def main():
                                     conn.commit()
                                     # Close the connection after interacting with the database
                                     conn.close()
+
+                                shutil.move(save_path, archive_file_path)
 
 
     except Exception as e:
