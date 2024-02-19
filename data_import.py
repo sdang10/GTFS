@@ -8,7 +8,7 @@ import zipfile
 import argparse
 import sys
 from urllib.parse import urljoin
-import numpy as np
+# import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
 import json
@@ -16,7 +16,7 @@ import shutil
 
 # external module imports
 import requests
-import psycopg2
+# import psycopg2
 
 # import class definitions
 from shane_pyutils.logutil import LogUtil
@@ -31,40 +31,7 @@ log = None
 logutil = None
 cfgutil = None
 pgdb = None
-
-# Desktop path
 desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
-
-
-# class to download a file using python requests library
-def download_file(url, save_path):
-    try:
-        response = requests.get(url)
-
-        # Check if the request was successful (status code 200)
-        response.raise_for_status()
-
-        # Save the content to a local file
-        with open(save_path, 'wb') as file:
-            file.write(response.content)
-
-        print(f"Downloaded successfully: {save_path}")
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
-
-
-# class to unzip a file 
-def unzip_file(zip_path, extract_path):
-    try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_path)
-        
-        print(f"Unzipped successfully as: {extract_path}")
-
-    except zipfile.BadZipFile as e:
-        print(f"Error: {e}")
-
 
 
 def main():
@@ -102,23 +69,23 @@ def main():
     feed_url = api_url + cfgutil.get_item('feed_info','feed_list')
     dl_url = api_url + cfgutil.get_item('feed_info','feed_download')
     # file metadata variables
-    file_data_variables = cfgutil.get_item('data_tracking', 'gtfs_file_data_variables')
+    file_data_variables = cfgutil.get_item('data_tracking', 'gtfs_file_data_variables').split(',') # Read gtfs_file_data_variables as a list
     # transitland allowables
-    allowed_files = cfgutil.get_item('data_tracking', 'allowed_files')
+    allowed_files = cfgutil.get_item('data_tracking', 'allowed_files').split(',') # Read allowed_files as a list
     # file path
     zip_file_path = cfgutil.get_item('feed_info','file_path')
     archive_file_path = '/shane_gtfs_static_archive/'
+    
     #dt_fmt = '%Y-%m-%d'
     #orca_start = dt.datetime.strptime('2019-01-01',dt_fmt)
+
 
     try:
 
         # create postgres database instance
         pgdb = PostgresDB(log, desc='dashboard postgres database')
-
         connection_params = cfgutil.get_section('db_postgres')
         log.info(f'Attempting to connect with parameters: {connection_params}')
-
 
         # connect to postgres database
         if not pgdb.open(cfgutil, 'db_postgres'):
@@ -135,10 +102,10 @@ def main():
         #         log.error(f'table {t} does not exist in {pgdb.desc}!')
         #         xit = True
 
-        # if xit: sys.exit()
+        if xit: 
+            sys.exit()
 
         # if args.input_dir:
-
 
         # start
         #log.info('----- desc -----')
@@ -150,78 +117,83 @@ def main():
 
             # get list of feeds from transitland after highest feed in data
             r = requests.get(feed_url + a[1], params={'api_key': api_key})
-            if r.status_code == 200:    # expect 200 code from transitland instead of using r.raise_for_status()
+
+            # expect 200 code from transitland instead of using r.raise_for_status()
+            if r.status_code == 200:
+
                 # get feeds and reverse list to work in chronological order
                 feeds = r.json()['feeds'][0]['feed_versions']
                 feeds.reverse()
-                print(feeds)
 
                 for f in feeds:
 
                     # Set file paths
-                    fp = fp = afp.replace('{feed_sha1}',f['sha1'])
+                    fp = afp.replace('{feed_sha1}',f['sha1'])
                     save_path = os.path.join(desktop_path, f"{f['sha1']}.zip")
                     extract_path = os.path.join(desktop_path, f"{f['sha1']}_extracted")
 
-
                     # Check the fetched_at date
-                    # fetched_at_date = dt.datetime.strptime(f['fetched_at'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
-                    # july_1_2023 = dt.date(2023, 7, 1)
+                    fetched_at_date = dt.datetime.strptime(f['fetched_at'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
+                    july_1_2023 = dt.date(2023, 7, 1)
 
-                    # if fetched_at_date >= july_1_2023:
+                    # check if fetched_at date is > specified date (to only import newer feeds)
+                    if fetched_at_date >= july_1_2023:
+                    # check if feed id > latest_id (to only import unimported feeds)
+                    # if f['id'] > a[2]:
 
 
+                        # import the file data into gtfs files table
+                        columns = ', '.join(f.keys())
+                        values = ', '.join([f"'{value}'" for value in f.values()])
 
-                    # for key in f:
+                        sql_query = f'INSERT INTO gtfs_files ({columns}) VALUES ({values})'
+
+                        # Execute the SQL query using your database library
+                        pgdb.query(sql_query)
+
+
+                        # Construct download URL
+                        download_url = urljoin(dl_url.replace('{feed_version_key}', f['sha1']), f"?api_key={api_key}")
+
+                        # Download the feed version
+                        try:
+
+                            response = requests.get(download_url)
+                            # Check if the request was successful (status code 200)
+                            response.raise_for_status()
+                            # Save the content to a local file
+                            with open(save_path, 'wb') as file:
+                                file.write(response.content)
+                            print(f"Downloaded successfully: {save_path}")
+
+                        except requests.exceptions.RequestException as e:
+
+                            print(f"Error: {e}")
+
+                        # Unzip the downloaded file
+                        try:
+
+                            with zipfile.ZipFile(save_path, 'r') as zip_ref:
+                                zip_ref.extractall(extract_path)
+                            print(f"Unzipped successfully as: {extract_path}")
+
+                        except zipfile.BadZipFile as e:
+
+                            print(f"Error: {e}")
+
+
+                        # List all files in the folder
+                        file_list = os.listdir(extract_path)
+                        # Iterate through each file in the folder
+
+                        for file in file_list:
+
+                            if file in allowed_files:
                         
-                    #     value = f[key]
-                    #     pgdb.query(f'INSERT INTO gtfs_files ({key}) VALUES ({value})')
-
-                    # check if feed id > latest_id (to only import newer feeds)
-                    if f['id'] > a[2]:
-
-                        # check if file already downloaded
-                        if not os.path.isfile(fp):
-
-                            # Construct download URL
-                            download_url = urljoin(dl_url.replace('{feed_version_key}', f['sha1']), f"?api_key={api_key}")
-                            # Download the feed version
-                            download_file(download_url, save_path)
-
-                            # Unzip the downloaded file
-                            try:
-
-                                unzip_file(save_path, extract_path)
-                        
-                            except Exception as e:
-                                print(f"Error unzipping file: {e}")
-
-                            # Generate SQL query dynamically
-                            columns = ', '.join(f.keys())
-                            print(columns)
-                            values = ', '.join([f"'{value}'" for value in f.values()])
-                            print(values)
-
-                            sql_query = f'INSERT INTO gtfs_files ({columns}) VALUES ({values})'
-
-                            # Execute the SQL query using your database library
-                            pgdb.query(sql_query)
-
-                            # List all files in the folder
-                            file_list = os.listdir(extract_path)
-                            # Iterate through each file in the folder
-
-                            for file in file_list:
-                                if file not in allowed_files:
-
-                                    next(file)
-
-                                else: 
-                            
-                                    file_path = os.path.join(extract_path, file)
-                                    # Check if it's a file (not a subfolder)
-
-                                    # if os.path.isfile(file_path):
+                                file_path = os.path.join(extract_path, file)
+                                
+                                # Check if it's a file (not a subfolder)
+                                if os.path.isfile(file_path):
 
                                     print(f"Importing file: {file}")
                                     # Split the filename and extension
@@ -255,15 +227,27 @@ def main():
                                         print("Not including the following columns from the DataFrame as they are not present in the SQL table:")
                                         print(df_extra_columns)
 
-                                        for index, row in df.iterrows():
-                                            for column in df_extra_columns:
-                                                value = row[column]
-                                                if value is not None and value != '':
-                                                    file_id = f['id']  # Example value, replace with actual file_id
-                                                    column_name = column
-                                                    # Insert values into gtfs_extra_attributes table
-                                                    insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{value}')")
-                                                    conn.execute(insert_query)
+                                        for column in df_extra_columns:
+                                            values = df[column]
+                                            if values is not None and values != '':
+                                                file_id = f['id']
+                                                column_name = column
+                                                # Insert values into gtfs_extra_attributes table
+                                                insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{value}')")
+                                                conn.execute(insert_query)
+
+
+
+
+                                        # for index, row in df.iterrows():
+                                        #     for column in df_extra_columns:
+                                        #         value = row[column]
+                                        #         if value is not None and value != '':
+                                        #             file_id = f['id']  # Example value, replace with actual file_id
+                                        #             column_name = column
+                                        #             # Insert values into gtfs_extra_attributes table
+                                        #             insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{value}')")
+                                        #             conn.execute(insert_query)
 
                                         df.drop(columns=df_extra_columns, inplace=True)
 
@@ -278,7 +262,7 @@ def main():
 
                                         for column in sql_extra_columns:
 
-                                            default_value = 'NA'  # Adjust the default value based on your requirements
+                                            default_value = ''  # Adjust the default value based on your requirements
                                             df[column] = default_value
                                         print(df)
 
@@ -291,7 +275,7 @@ def main():
                                     # Close the connection after interacting with the database
                                     conn.close()
 
-                                shutil.move(save_path, archive_file_path)
+                                # shutil.move(save_path, archive_file_path)
 
 
     except Exception as e:
@@ -301,6 +285,7 @@ def main():
         log.error(tb.format_exc())
 
     finally:
+        pgdb.close(True)
         # close the log file with final message
         logutil.remove_file_log('script completed')
 
