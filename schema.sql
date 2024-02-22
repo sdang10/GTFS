@@ -4,15 +4,20 @@ SELECT * FROM gtfs.v_transitland_feed_info;
 
 
 DROP TABLE gtfs_test.transitland_stop_times; 
-DROP TABLE gtfs_test.transitland_trips ;
-DROP TABLE gtfs_test.transitland_fare_rules ;
-DROP TABLE gtfs_test.transitland_fare_attributes;
+DROP TABLE gtfs_test.transitland_trips;
 DROP TABLE gtfs_test.transitland_shapes;
 DROP TABLE gtfs_test.transitland_calendar_dates;
 DROP TABLE gtfs_test.transitland_calendar;
 DROP TABLE gtfs_test.transitland_routes;
-DROP TABLE gtfs_test.transitland_stops ;
+DROP TABLE gtfs_test.transitland_stops;
 DROP TABLE gtfs_test.transitland_agency;
+DROP TABLE gtfs_test.transitland_feed_info;
+DROP TABLE gtfs_test.transitland_transfers;
+DROP TABLE gtfs_test.transitland_fare_attributes;
+DROP TABLE gtfs_test.transitland_fare_rules;
+
+
+
 DROP TABLE gtfs_test.transitland_timeframes;
 DROP TABLE gtfs_test.transitland_fare_media;
 DROP TABLE gtfs_test.transitland_fare_products;
@@ -23,10 +28,8 @@ DROP TABLE gtfs_test.transitland_stop_areas;
 DROP TABLE gtfs_test.transitland_networks;
 DROP TABLE gtfs_test.transitland_route_networks;
 DROP TABLE gtfs_test.transitland_frequencies;
-DROP TABLE gtfs_test.transitland_transfers;
 DROP TABLE gtfs_test.transitland_pathways;
 DROP TABLE gtfs_test.transitland_levels;
-DROP TABLE gtfs_test.transitland_feed_info;
 DROP TABLE gtfs_test.transitland_attributions;
 
 
@@ -116,28 +119,6 @@ CREATE TABLE gtfs_test.transitland_shapes (
 );
 
 
-CREATE TABLE gtfs_test.transitland_fare_attributes (
-	file_id TEXT,
-	fare_id TEXT, -- PRIMARY KEY
-	price TEXT,
-	currency_type TEXT,
-	payment_method TEXT,
-	transfers TEXT,
-	agency_id TEXT, -- REFERENCES agency.agency_id
-	transfer_duration TEXT
-);
-
-
-CREATE TABLE gtfs_test.transitland_fare_rules (
-	file_id TEXT,
-	fare_id TEXT, -- REFERENCES fare_attributes.fare_id
-	route_id TEXT, -- REFERENCES routes.route_id
-	origin_id TEXT, -- REFERENCES stops.zone_id
-	destination_id TEXT, -- REFERENCES stops.zone_id
-	contains_id TEXT
-);
-
-
 CREATE TABLE gtfs_test.transitland_trips (
 	file_id TEXT,
 	route_id TEXT, -- REFERENCES routes.route_id
@@ -170,6 +151,55 @@ CREATE TABLE gtfs_test.transitland_stop_times (
 );
 
 
+CREATE TABLE gtfs_test.transitland_transfers (
+	file_id TEXT,
+	from_stop_id TEXT, -- PRIMARY KEY REFERENCES stops.stop_id
+	to_stop_id TEXT, -- PRIMARY KEY REFERENCES stops.stop_id
+	from_route_id TEXT, -- PRIMARY KEY REFERENCES routes.route_id
+	to_route_id TEXT, -- PRIMARY KEY REFERENCES routes.route_id
+	from_trip_id TEXT, -- PRIMARY KEY REFERENCES trips.trip_id
+	to_trip_id TEXT, -- PRIMARY KEY REFERENCES trips.trip_id
+	transfer_type TEXT,
+	min_transfer_time TEXT
+);
+
+
+CREATE TABLE gtfs_test.transitland_feed_info (
+	file_id TEXT,
+	feed_publisher_name TEXT,
+	feed_publisher_url TEXT,
+	feed_lang TEXT,
+	default_lang TEXT,
+	feed_start_date TEXT,
+	feed_end_date TEXT,
+	feed_version TEXT,
+	feed_contact_email TEXT,
+	feed_contact_url TEXT
+);
+
+
+CREATE TABLE gtfs_test.transitland_fare_attributes (
+	file_id TEXT,
+	fare_id TEXT, -- PRIMARY KEY
+	price TEXT,
+	currency_type TEXT,
+	payment_method TEXT,
+	transfers TEXT,
+	agency_id TEXT, -- REFERENCES agency.agency_id
+	transfer_duration TEXT
+);
+
+
+CREATE TABLE gtfs_test.transitland_fare_rules (
+	file_id TEXT,
+	fare_id TEXT, -- REFERENCES fare_attributes.fare_id
+	route_id TEXT, -- REFERENCES routes.route_id
+	origin_id TEXT, -- REFERENCES stops.zone_id
+	destination_id TEXT, -- REFERENCES stops.zone_id
+	contains_id TEXT
+);
+
+
 CREATE TABLE gtfs_test.transitland_timeframes (
 	file_id TEXT,
 	timeframe_group_id TEXT,
@@ -177,6 +207,7 @@ CREATE TABLE gtfs_test.transitland_timeframes (
 	end_time TEXT,
 	service_id TEXT
 );
+
 
 
 CREATE TABLE gtfs_test.transitland_fare_media (
@@ -187,6 +218,7 @@ CREATE TABLE gtfs_test.transitland_fare_media (
 );
 
 
+
 CREATE TABLE gtfs_test.transitland_fare_products (
 	file_id TEXT,
 	fare_product_id TEXT, -- PRIMARY KEY
@@ -195,6 +227,7 @@ CREATE TABLE gtfs_test.transitland_fare_products (
 	amount TEXT,
 	currency TEXT
 );
+
 
 
 CREATE TABLE gtfs_test.transitland_fare_leg_rules (
@@ -209,6 +242,7 @@ CREATE TABLE gtfs_test.transitland_fare_leg_rules (
 );
 
 
+
 CREATE TABLE gtfs_test.transitland_fare_transfer_rules (
 	file_id TEXT,
 	from_leg_group_id TEXT, -- PRIMARY KEY REFERENCES fare_leg_rules.leg_group_id
@@ -221,11 +255,13 @@ CREATE TABLE gtfs_test.transitland_fare_transfer_rules (
 );
 
 
+
 CREATE TABLE gtfs_test.transitland_areas (
 	file_id TEXT,
 	area_id TEXT, -- PRIMARY KEY
 	area_name TEXT
 );
+
 
 
 CREATE TABLE gtfs_test.transitland_stop_areas (
@@ -235,6 +271,7 @@ CREATE TABLE gtfs_test.transitland_stop_areas (
 );
 
 
+
 CREATE TABLE gtfs_test.transitland_networks (
 	file_id TEXT,
 	network_id TEXT, -- PRIMARY KEY
@@ -242,11 +279,13 @@ CREATE TABLE gtfs_test.transitland_networks (
 );
 
 
+
 CREATE TABLE gtfs_test.transitland_route_networks (
 	file_id TEXT,
 	network_id TEXT, -- REFERENCES networks.network_id
 	route_id TEXT
 );
+
 
 
 CREATE TABLE gtfs_test.transitland_frequencies (
@@ -258,18 +297,6 @@ CREATE TABLE gtfs_test.transitland_frequencies (
 	exact_times TEXT
 );
 
-
-CREATE TABLE gtfs_test.transitland_transfers (
-	file_id TEXT,
-	from_stop_id TEXT, -- PRIMARY KEY REFERENCES stops.stop_id
-	to_stop_id TEXT, -- PRIMARY KEY REFERENCES stops.stop_id
-	from_route_id TEXT, -- PRIMARY KEY REFERENCES routes.route_id
-	to_route_id TEXT, -- PRIMARY KEY REFERENCES routes.route_id
-	from_trip_id TEXT, -- PRIMARY KEY REFERENCES trips.trip_id
-	to_trip_id TEXT, -- PRIMARY KEY REFERENCES trips.trip_id
-	transfer_type TEXT,
-	min_transfer_time TEXT
-);
 
 CREATE TABLE gtfs_test.transitland_pathways (
 	file_id TEXT,
@@ -288,12 +315,14 @@ CREATE TABLE gtfs_test.transitland_pathways (
 );
 
 
+
 CREATE TABLE gtfs_test.transitland_levels (
 	file_id TEXT,
 	level_id TEXT, -- PRIMARY KEY
 	level_index TEXT,
 	level_name TEXT
 );
+
 
 
 CREATE TABLE gtfs_test.transitland_translations (
@@ -305,20 +334,6 @@ CREATE TABLE gtfs_test.transitland_translations (
 	record_id TEXT, -- PRIMARY KEY
 	record_sub_id TEXT, -- PRIMARY KEY
 	field_value TEXT
-);
-
-
-CREATE TABLE gtfs_test.transitland_feed_info (
-	file_id TEXT,
-	feed_publisher_name TEXT,
-	feed_publisher_url TEXT,
-	feed_lang TEXT,
-	default_lang TEXT,
-	feed_start_date TEXT,
-	feed_end_date TEXT,
-	feed_version TEXT,
-	feed_contact_email TEXT,
-	feed_contact_url TEXT
 );
 
 
@@ -336,6 +351,7 @@ CREATE TABLE gtfs_test.transitland_attributions (
 	attribution_email TEXT,
 	attribution_phone TEXT
 );
+
 
 
 SELECT * FROM gtfs_test.transitland_agency
@@ -370,8 +386,9 @@ SELECT * FROM gtfs_test.transitland_attributions
 -------------------------------------------------------------------------------------------
 
 
-DROP TABLE gtfs_test.transitland_translations;
+DROP TABLE gtfs_test.gtfs_files;
 DROP TABLE gtfs_test.gtfs_extra_attributes;
+DROP TABLE gtfs_test.gtfs_extra_files
 
 
 
@@ -393,9 +410,16 @@ CREATE TABLE gtfs_test.gtfs_files (
 );
 
 
+CREATE TABLE gtfs_test.gtfs_extra_files (
+	file_id TEXT,
+	file_name TEXT
+);
+
+
 
 SELECT * FROM gtfs_test.gtfs_extra_attributes 
 SELECT * FROM gtfs_test.gtfs_files
+SELECT * FROM gtfs_test.gtfs_extra_files
 
 
 --------------------------------------------------------------------------------------------
@@ -867,9 +891,10 @@ CREATE TABLE gtfs_test.e_fare_transfer_types(
 	fare_transfer_type_descr TEXT
 );
 
--- UUHHHHHHH????
 INSERT INTO gtfs_test.e_fare_transfer_types VALUES 
-	(),
+	(0, "From-leg fare_leg_rules.fare_product_id plus fare_transfer_rules.fare_product_id; A + AB"),
+	(1, "From-leg fare_leg_rules.fare_product_id plus fare_transfer_rules.fare_product_id plus to-leg fare_leg_rules.fare_product_id; A + AB + B"),
+	(2, "fare_transfer_rules.fare_product_id; AB")
 
 
 
