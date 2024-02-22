@@ -11,8 +11,8 @@ from urllib.parse import urljoin
 # import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
-import json
-import shutil
+# import json
+# import shutil
 
 # external module imports
 import requests
@@ -74,10 +74,10 @@ def main():
     allowed_files = cfgutil.get_item('data_tracking', 'allowed_files').split(',') # Read allowed_files as a list
     # file path
     zip_file_path = cfgutil.get_item('feed_info','file_path')
-    archive_file_path = '/shane_gtfs_static_archive/'
+    # archive_file_path = '/shane_gtfs_static_archive/'
     
-    #dt_fmt = '%Y-%m-%d'
-    #orca_start = dt.datetime.strptime('2019-01-01',dt_fmt)
+    # dt_fmt = '%Y-%m-%d'
+    # orca_start = dt.datetime.strptime('2019-01-01',dt_fmt)
 
 
     try:
@@ -110,7 +110,7 @@ def main():
         # start
         #log.info('----- desc -----')
         # iterate over each agency - get agency id (0) feed endpoints (1) and latest id (2) from database
-        for a in pgdb.fetchall('SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info'):
+        for a in pgdb.fetchall('SELECT feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info'):
 
             # initialize agency file path with onestop_id (still missing feed_sha1)
             afp = zip_file_path.replace('{feed_onestop_id}', a[1])
@@ -140,17 +140,16 @@ def main():
                     if fetched_at_date >= july_1_2023:
                     # check if feed id > latest_id (to only import unimported feeds)
                     # if f['id'] > a[2]:
-
+                        
+                        file_id = f['id']
 
                         # import the file data into gtfs files table
                         columns = ', '.join(f.keys())
                         values = ', '.join([f"'{value}'" for value in f.values()])
 
-                        sql_query = f'INSERT INTO gtfs_files ({columns}) VALUES ({values})'
-
                         # Execute the SQL query using your database library
+                        sql_query = f'INSERT INTO gtfs_files ({columns}) VALUES ({values})'
                         pgdb.query(sql_query)
-
 
                         # Construct download URL
                         download_url = urljoin(dl_url.replace('{feed_version_key}', f['sha1']), f"?api_key={api_key}")
@@ -203,13 +202,14 @@ def main():
                                     table_name = f"transitland_{file_name}"
                                     df = pd.read_csv(file_path)
                                     df = df.astype(str)
+                                    df['file_id'] = file_id
 
-                                    # connect to Postgres db
+                                    # connect to Postgres db via sqlalchemy
                                     conn_string = f'postgresql://{pg_username}:{pg_password}@{pg_host}:{pg_port}/{pg_db_name}?options=-csearch_path={pg_schema}'
                                     db = create_engine(conn_string) 
                                     conn = db.connect() 
-                                    
 
+                                    
                                     # Get column names from the DataFrame
                                     df_columns = df.columns.tolist()
 
@@ -229,25 +229,12 @@ def main():
 
                                         for column in df_extra_columns:
                                             values = df[column]
-                                            if values is not None and values != '':
-                                                file_id = f['id']
+                                            if values is not None and not values.empty:
                                                 column_name = column
+
                                                 # Insert values into gtfs_extra_attributes table
-                                                insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{value}')")
+                                                insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{values}')")
                                                 conn.execute(insert_query)
-
-
-
-
-                                        # for index, row in df.iterrows():
-                                        #     for column in df_extra_columns:
-                                        #         value = row[column]
-                                        #         if value is not None and value != '':
-                                        #             file_id = f['id']  # Example value, replace with actual file_id
-                                        #             column_name = column
-                                        #             # Insert values into gtfs_extra_attributes table
-                                        #             insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{value}')")
-                                        #             conn.execute(insert_query)
 
                                         df.drop(columns=df_extra_columns, inplace=True)
 
@@ -264,18 +251,25 @@ def main():
 
                                             default_value = ''  # Adjust the default value based on your requirements
                                             df[column] = default_value
-                                        print(df)
+                                        # print(df)
 
                                     # imort dataframe data into postgressql
                                     df.to_sql(table_name, con=conn, if_exists='append', index=False) 
-                                    print(pd.read_sql(f"SELECT * FROM {table_name}", conn))
+                                    # print(pd.read_sql(f"SELECT * FROM {table_name}", conn))
 
                                     # commit the changes made to the database
                                     conn.commit()
+
                                     # Close the connection after interacting with the database
                                     conn.close()
 
                                 # shutil.move(save_path, archive_file_path)
+                            
+                            else: 
+                                
+                                # note extra text files in the extra files table 
+                                sql_query = f"INSERT INTO gtfs_extra_files VALUES ('{file_id}', '{file}');"
+                                pgdb.query(sql_query)
 
 
     except Exception as e:
