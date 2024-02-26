@@ -15,6 +15,8 @@ DROP TABLE gtfs_test.transitland_feed_info;
 DROP TABLE gtfs_test.transitland_transfers;
 DROP TABLE gtfs_test.transitland_fare_attributes;
 DROP TABLE gtfs_test.transitland_fare_rules;
+DROP TABLE gtfs_test.transitland_frequencies;
+DROP TABLE gtfs_test.transitland_areas;
 
 
 
@@ -23,11 +25,9 @@ DROP TABLE gtfs_test.transitland_fare_media;
 DROP TABLE gtfs_test.transitland_fare_products;
 DROP TABLE gtfs_test.transitland_fare_leg_rules;
 DROP TABLE gtfs_test.transitland_fare_transfer_rules;
-DROP TABLE gtfs_test.transitland_areas;
 DROP TABLE gtfs_test.transitland_stop_areas;
 DROP TABLE gtfs_test.transitland_networks;
 DROP TABLE gtfs_test.transitland_route_networks;
-DROP TABLE gtfs_test.transitland_frequencies;
 DROP TABLE gtfs_test.transitland_pathways;
 DROP TABLE gtfs_test.transitland_levels;
 DROP TABLE gtfs_test.transitland_attributions;
@@ -200,6 +200,23 @@ CREATE TABLE gtfs_test.transitland_fare_rules (
 );
 
 
+CREATE TABLE gtfs_test.transitland_frequencies (
+	file_id TEXT,
+	trip_id TEXT, -- PRIMARY KEY REFERENCES trips.trip_id
+	start_time TEXT, -- PRIMARY KEY
+	end_time TEXT,
+	headway_secs TEXT,
+	exact_times TEXT
+);
+
+
+CREATE TABLE gtfs_test.transitland_areas (
+	file_id TEXT,
+	area_id TEXT, -- PRIMARY KEY
+	area_name TEXT
+);
+
+
 CREATE TABLE gtfs_test.transitland_timeframes (
 	file_id TEXT,
 	timeframe_group_id TEXT,
@@ -256,14 +273,6 @@ CREATE TABLE gtfs_test.transitland_fare_transfer_rules (
 
 
 
-CREATE TABLE gtfs_test.transitland_areas (
-	file_id TEXT,
-	area_id TEXT, -- PRIMARY KEY
-	area_name TEXT
-);
-
-
-
 CREATE TABLE gtfs_test.transitland_stop_areas (
 	file_id TEXT,
 	area_id TEXT, -- PRIMARY KEY REFERENCES areas.area_id
@@ -284,17 +293,6 @@ CREATE TABLE gtfs_test.transitland_route_networks (
 	file_id TEXT,
 	network_id TEXT, -- REFERENCES networks.network_id
 	route_id TEXT
-);
-
-
-
-CREATE TABLE gtfs_test.transitland_frequencies (
-	file_id TEXT,
-	trip_id TEXT, -- PRIMARY KEY REFERENCES trips.trip_id
-	start_time TEXT, -- PRIMARY KEY
-	end_time TEXT,
-	headway_secs TEXT,
-	exact_times TEXT
 );
 
 
@@ -386,18 +384,10 @@ SELECT * FROM gtfs_test.transitland_attributions
 -------------------------------------------------------------------------------------------
 
 
-DROP TABLE gtfs_test.gtfs_files;
 DROP TABLE gtfs_test.gtfs_extra_attributes;
-DROP TABLE gtfs_test.gtfs_extra_files
+DROP TABLE gtfs_test.gtfs_extra_files;
+DROP TABLE gtfs_test.gtfs_files;
 
-
-
-CREATE TABLE gtfs_test.gtfs_extra_attributes (
-    file_id TEXT,
-   	file_name TEXT,
-    column_name TEXT,
-    value TEXT
-);
 
 
 CREATE TABLE gtfs_test.gtfs_files (
@@ -408,6 +398,16 @@ CREATE TABLE gtfs_test.gtfs_files (
 	sha1 TEXT,
 	url TEXT
 );
+
+
+
+CREATE TABLE gtfs_test.gtfs_extra_attributes (
+    file_id TEXT,
+   	file_name TEXT,
+    column_name TEXT,
+    value TEXT
+);
+
 
 
 CREATE TABLE gtfs_test.gtfs_extra_files (
@@ -422,6 +422,46 @@ SELECT * FROM gtfs_test.gtfs_files
 SELECT * FROM gtfs_test.gtfs_extra_files
 
 
+---------------------------------------------------------------------------
+
+
+DROP TABLE gtfs_test.real_gtfs_extra_attributes;
+DROP TABLE gtfs_test.real_gtfs_extra_files;
+DROP TABLE gtfs_test.real_gtfs_files;
+
+
+
+CREATE TABLE gtfs_test.real_gtfs_files (
+	file_id INT PRIMARY KEY,
+	fetched_at TEXT,
+	earliest_calendar_date DATE,
+	latest_calendar_date DATE,
+	sha1 TEXT,
+	url TEXT
+);
+
+
+
+CREATE TABLE gtfs_test.real_gtfs_extra_attributes (
+    file_id INT REFERENCES gtfs_test.gtfs_files(file_id),
+   	file_name TEXT,
+    column_name TEXT,
+    value TEXT
+);
+
+
+
+CREATE TABLE gtfs_test.real_gtfs_extra_files (
+	file_id INT REFERENCES gtfs_test.gtfs_files(file_id),
+	file_name TEXT
+);
+
+
+SELECT * FROM gtfs_test.real_gtfs_extra_attributes 
+SELECT * FROM gtfs_test.real_gtfs_files
+SELECT * FROM gtfs_test.real_gtfs_extra_files
+
+
 --------------------------------------------------------------------------------------------
 
 
@@ -434,21 +474,24 @@ DROP TABLE gtfs_test.real_transitland_calendar_dates;
 DROP TABLE gtfs_test.real_transitland_calendar;
 DROP TABLE gtfs_test.real_transitland_routes;
 DROP TABLE gtfs_test.real_transitland_stops ;
+DROP TABLE gtfs_test.real_transitland_areas;
+DROP TABLE gtfs_test.real_transitland_frequencies;
+DROP TABLE gtfs_test.real_transitland_transfers;
+DROP TABLE gtfs_test.real_transitland_feed_info;
 DROP TABLE gtfs_test.real_transitland_agency;
+
+
 DROP TABLE gtfs_test.real_transitland_timeframes;
 DROP TABLE gtfs_test.real_transitland_fare_media;
 DROP TABLE gtfs_test.real_transitland_fare_products;
 DROP TABLE gtfs_test.real_transitland_fare_leg_rules;
 DROP TABLE gtfs_test.real_transitland_fare_transfer_rules;
-DROP TABLE gtfs_test.real_transitland_areas;
 DROP TABLE gtfs_test.real_transitland_stop_areas;
 DROP TABLE gtfs_test.real_transitland_networks;
 DROP TABLE gtfs_test.real_transitland_route_networks;
 DROP TABLE gtfs_test.real_transitland_frequencies;
-DROP TABLE gtfs_test.real_transitland_transfers;
 DROP TABLE gtfs_test.real_transitland_pathways;
 DROP TABLE gtfs_test.real_transitland_levels;
-DROP TABLE gtfs_test.real_transitland_feed_info;
 DROP TABLE gtfs_test.real_transitland_attributions;
 
 
@@ -456,7 +499,7 @@ DROP TABLE gtfs_test.real_transitland_attributions;
 
 
 CREATE TABLE gtfs_test.real_transitland_agency (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_test.gtfs_files(file_id),
 	agency_id TEXT NOT NULL,
 	agency_name TEXT NOT NULL,
 	agency_url TEXT NOT NULL,
@@ -472,7 +515,7 @@ CREATE TABLE gtfs_test.real_transitland_agency (
 -- when creating from the data: ST_SetSRID(ST_MakePoint(stop_lon::numeric(9,6), stop_lat::numeric(8,6)), 32610)
 
 CREATE TABLE gtfs_test.real_transitland_stops (
-	file_id ID REFERENCES gtfs_files(id),
+	file_id ID REFERENCES gtfs_files(file_id),
 	stop_id TEXT NOT NULL,
 	stop_code TEXT,
 	stop_name TEXT, 
@@ -528,7 +571,7 @@ INSERT INTO gtfs_test.e_wheelchair_boardings VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_routes (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	route_id TEXT NOT NULL,
 	agency_id TEXT REFERENCES real_transitland_agency(agency_id),
 	route_short_name TEXT, 
@@ -594,7 +637,7 @@ INSERT INTO gtfs_test.e_continuous_drop_off VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_calendar (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	service_id TEXT NOT NULL REFERENCES gtfs_test.e_service_availability(service_availability),
 	monday SMALLINT NOT NULL REFERENCES gtfs_test.e_service_availability(service_availability),
 	tuesday SMALLINT NOT NULL REFERENCES gtfs_test.e_service_availability(service_availability),
@@ -623,7 +666,7 @@ INSERT INTO gtfs_test.e_service_availability VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_calendar_dates (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	service_id TEXT, -- REFERENCES real_transitland_calender(service_id) OR ID
 	date DATE NOT NULL, 
 	exception_type SMALLINT NOT NULL REFERENCES gtfs_test.e_exception_types(exception_type),
@@ -643,7 +686,7 @@ INSERT INTO gtfs_test.e_exception_types VALUES
 
 -- CREATE A POINT GEOMETRY USING LAT AND LON
 CREATE TABLE gtfs_test.real_transitland_shapes (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	shape_id TEXT NOT NULL,
 	shape_pt_lat TEXT NOT NULL,
 	shape_pt_lon TEXT NOT NULL,
@@ -655,7 +698,7 @@ CREATE TABLE gtfs_test.real_transitland_shapes (
 
 
 CREATE TABLE gtfs_test.real_transitland_fare_attributes (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	fare_id TEXT NOT NULL,
 	price NUMERIC(7,2) NOT NULL,  --- CONVERT TO CENTS SO WE CAN USE INT INSTEAD OF FLOAT OR KEEP TEXT
 	currency_type TEXT NOT NULL,
@@ -692,7 +735,7 @@ INSERT INTO gtfs_test.e_transfers VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_fare_rules (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	fare_id TEXT REFERENCES real_transitland_fare_attributes(fare_id) NOT NULL,
 	route_id TEXT REFERENCES real_transitland_routes(route_id),
 	origin_id TEXT REFERENCES real_transitland_stops(zone_id),
@@ -703,7 +746,7 @@ CREATE TABLE gtfs_test.real_transitland_fare_rules (
 
 -- EMPTIES DEFAULT TO 0 for TRIPS.txt
 CREATE TABLE gtfs_test.real_transitland_trips (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	route_id TEXT REFERENCES real_transitland_routes(route_id) NOT NULL,
 	service_id TEXT NOT NULL, -- REFERENCES real_transitland_calendar(service_id) OR REFERENCES real_transitland_calendar_dates(service_id)
 	trip_id TEXT NOT NULL,
@@ -753,7 +796,7 @@ INSERT INTO gtfs_test.e_bikes_allowed VALUES
 -- IF VARIABLES PICKUP AND DROP OFF TYPES ARE BLANK THEY DEFAULT TO 0
 -- IF VARIBLES CONTINUOUS PICKUP AND DROP OFF AND TIMEPOINT ARE BLANK, DEFAULT TO 1
 CREATE TABLE gtfs_test.real_transitland_stop_times (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	trip_id TEXT REFERENCES real_transitland_trips(trip_id) NOT NULL,
 	arrival_time INTERVAL,
 	departure_time INTERVAL,
@@ -805,7 +848,7 @@ INSERT INTO gtfs_test.e_timepoint VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_timeframes (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	timeframe_group_id TEXT NOT NULL,
 	start_time TIME,  -- KEEP TIME FOR THESE
 	end_time TIME, 
@@ -815,7 +858,7 @@ CREATE TABLE gtfs_test.real_transitland_timeframes (
 
 
 CREATE TABLE gtfs_test.real_transitland_fare_media (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	fare_media_id TEXT NOT NULL,
 	fare_media_name TEXT,
 	fare_media_type SMALLINT NOT NULL REFERENCES gtfs_test.e_fare_media_types(fare_media_type),
@@ -838,7 +881,7 @@ INSERT INTO gtfs_test.e_fare_media_types VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_fare_products (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	fare_product_id TEXT NOT NULL,
 	fare_product_name TEXT,
 	fare_media_id ID REFERENCES real_transitland_fare_media(fare_media_id),
@@ -849,7 +892,7 @@ CREATE TABLE gtfs_test.real_transitland_fare_products (
 
 
 CREATE TABLE gtfs_test.real_transitland_fare_leg_rules (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	leg_group_id TEXT,
 	network_id TEXT -- REFERENCES real_transitland_networks(network_id) OR REFERENCES real_transitland_routes(network_id)
 	from_area_id TEXT REFERENCES real_transitland_areas(area_id),
@@ -862,7 +905,7 @@ CREATE TABLE gtfs_test.real_transitland_fare_leg_rules (
 
 
 CREATE TABLE gtfs_test.real_transitland_fare_transfer_rules (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	from_leg_group_id TEXT REFERENCES real_transitland_fare_leg_rules(leg_group_id),
 	to_leg_group_id TEXT REFERENCES real_transitland_fare_leg_rules(leg_group_id),
 	transfer_count INT,
@@ -900,7 +943,7 @@ INSERT INTO gtfs_test.e_fare_transfer_types VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_areas (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	area_id TEXT NOT NULL,
 	area_name TEXT,
 	PRIMARY KEY(file_id, area_id)
@@ -908,7 +951,7 @@ CREATE TABLE gtfs_test.real_transitland_areas (
 
 
 CREATE TABLE gtfs_test.real_transitland_stop_areas (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	area_id TEXT REFERENCES real_transitland_areas(area_id) NOT NULL,
 	stop_id TEXT REFERENCES real_transitland_stops(stop_id) NOT NULL,
 	PRIMARY KEY(file_id, area_id, stop_id)
@@ -916,7 +959,7 @@ CREATE TABLE gtfs_test.real_transitland_stop_areas (
 
 
 CREATE TABLE gtfs_test.real_transitland_networks (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	network_id TEXT NOT NULL,
 	network_name TEXT,
 	PRIMARY KEY(file_id, network_id)
@@ -924,7 +967,7 @@ CREATE TABLE gtfs_test.real_transitland_networks (
 
 
 CREATE TABLE gtfs_test.real_transitland_route_networks (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	network_id TEXT REFERENCES real_transitland_networks(network_id) NOT NULL,
 	route_id TEXT REFERENCES real_transitland_routes(route_id) NOT NULL,
 	PRIMARY KEY(file_id, route_id)
@@ -932,7 +975,7 @@ CREATE TABLE gtfs_test.real_transitland_route_networks (
 
 
 CREATE TABLE gtfs_test.real_transitland_frequencies (
-	file_id ID REFERENCES gtfs_files(id),
+	file_id ID REFERENCES gtfs_files(file_id),
 	trip_id ID REFERENCES real_transitland_trips(trip_id) NOT NULL,
 	start_time INTERVAL NOT NULL, 
 	end_time INTERVAL NOT NULL,
@@ -943,7 +986,7 @@ CREATE TABLE gtfs_test.real_transitland_frequencies (
 
 -- TRANSFER TYPE BLANKS DEFAULT TO 0
 CREATE TABLE gtfs_test.real_transitland_transfers (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	from_stop_id TEXT REFERENCES real_transitland_stops(stop_id),
 	to_stop_id TEXT REFERENCES real_transitland_stops(stop_id), 
 	from_route_id TEXT REFERENCES real_transitland_routes(route_id),
@@ -972,7 +1015,7 @@ INSERT INTO gtfs_test.e_transfer_types VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_pathways (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	pathway_id TEXT PRIMARY KEY NOT NULL,
 	from_stop_id TEXT REFERENCES real_transitland_stops(stop_id) NOT NULL,
 	to_stop_id TEXT REFERENCES real_transitland_stops(stop_id) NOT NULL,
@@ -1017,7 +1060,7 @@ INSERT INTO gtfs_test.is_bidirectional VALUES
 
 
 CREATE TABLE gtfs_test.real_transitland_levels (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	level_id TEXT PRIMARY KEY NOT NULL,
 	level_index FLOAT NOT NULL,
 	level_name TEXT,
@@ -1026,7 +1069,7 @@ CREATE TABLE gtfs_test.real_transitland_levels (
 
 
 CREATE TABLE gtfs_test.real_transitland_translations (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	table_name ENUM NO NULL, -----------------------?????
 	field_name TEXT NOT NULL,
 	language TEXT NOT NULL,
@@ -1039,7 +1082,7 @@ CREATE TABLE gtfs_test.real_transitland_translations (
 
 
 CREATE TABLE gtfs_test.real_transitland_feed_info (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	feed_publisher_name TEXT NOT NULL,
 	feed_publisher_url TEXT NOT NULL,
 	feed_lang TEXT NOT NULL,
@@ -1054,7 +1097,7 @@ CREATE TABLE gtfs_test.real_transitland_feed_info (
 
 -- empties default to 0's 
 CREATE TABLE gtfs_test.real_transitland_attributions (
-	file_id INT REFERENCES gtfs_files(id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	attribution_id TEXT,
 	agency_id TEXT REFERENCES real_transitland_agency(agency_id), 
 	route_id TEXT REFERENCES real_transitland_routes(route_id), 
@@ -1108,7 +1151,3 @@ SELECT * FROM gtfs_test.real_transitland_levels
 SELECT * FROM gtfs_test.real_transitland_translations
 SELECT * FROM gtfs_test.real_transitland_feed_info
 SELECT * FROM gtfs_test.real_transitland_attributions
-
-
-
-
