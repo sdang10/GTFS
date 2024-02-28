@@ -81,7 +81,7 @@ CREATE TABLE gtfs_test.transitland_routes (
 	route_text_color TEXT,
 	route_sort_order TEXT,
 	continuous_pickup TEXT,
-	continuoues_dropoff TEXT,
+	continuous_drop_off TEXT,
 	network_id TEXT
 );
 
@@ -145,7 +145,7 @@ CREATE TABLE gtfs_test.transitland_stop_times (
 	pickup_type TEXT,
 	drop_off_type TEXT,
 	continuous_pickup TEXT,
-	continuous_dropoff TEXT,
+	continuous_drop_off TEXT,
 	shape_dist_traveled TEXT,
 	timepoint TEXT
 );
@@ -512,10 +512,9 @@ CREATE TABLE gtfs_test.real_transitland_agency (
 );
 
 
--- when creating from the data: ST_SetSRID(ST_MakePoint(stop_lon::numeric(9,6), stop_lat::numeric(8,6)), 32610)
 
 CREATE TABLE gtfs_test.real_transitland_stops (
-	file_id ID REFERENCES gtfs_files(file_id),
+	file_id INT REFERENCES gtfs_files(file_id),
 	stop_id TEXT NOT NULL,
 	stop_code TEXT,
 	stop_name TEXT, 
@@ -535,7 +534,6 @@ CREATE TABLE gtfs_test.real_transitland_stops (
 	PRIMARY KEY(file_id,stop_id)
 );
 
--- BLANK location types in STOPS.txt get defaulted to 0
 
 
 CREATE TABLE gtfs_test.e_location_types(
@@ -583,7 +581,7 @@ CREATE TABLE gtfs_test.real_transitland_routes (
 	route_text_color TEXT,
 	route_sort_order INT, 
 	continuous_pickup SMALLINT REFERENCES e_continuous_pickup(continuous_pickup),
-	continuoues_dropoff SMALLINT REFERENCES e_continuous_drop_off(continuous_drop_off),
+	continuous_drop_off SMALLINT REFERENCES e_continuous_drop_off(continuous_drop_off),
 	network_id TEXT,
 	PRIMARY KEY(file_id, route_id)
 );
@@ -613,7 +611,7 @@ CREATE TABLE gtfs_test.e_continuous_pickup (
 	continuous_pickup_descr TEXT
 );
 
--- FOR THIS ONE, BLANKS DEFAULT TO 1 NOT 0!!!
+
 INSERT INTO gtfs_test.e_continuous_pickup VALUES 
 	(0, "continuous stopping pickup"),
 	(1, "no continuous stopping pickup"),
@@ -627,7 +625,7 @@ CREATE TABLE gtfs_test.e_continuous_drop_off (
 	continuous_drop_off_descr TEXT
 );
 
--- FOR THIS ONE, BLANKS DEFAULT TO 1 NOT 0!!!
+
 INSERT INTO gtfs_test.e_continuous_drop_off VALUES 
 	(0, "continuous stopping drop off"),
 	(1, "no continuous stopping drop off"),
@@ -684,7 +682,7 @@ INSERT INTO gtfs_test.e_exception_types VALUES
 	(2, "service has been removed for the specified date");
 
 
--- CREATE A POINT GEOMETRY USING LAT AND LON
+
 CREATE TABLE gtfs_test.real_transitland_shapes (
 	file_id INT REFERENCES gtfs_files(file_id),
 	shape_id TEXT NOT NULL,
@@ -700,7 +698,7 @@ CREATE TABLE gtfs_test.real_transitland_shapes (
 CREATE TABLE gtfs_test.real_transitland_fare_attributes (
 	file_id INT REFERENCES gtfs_files(file_id),
 	fare_id TEXT NOT NULL,
-	price NUMERIC(7,2) NOT NULL,  --- CONVERT TO CENTS SO WE CAN USE INT INSTEAD OF FLOAT OR KEEP TEXT
+	price TEXT NOT NULL,  --- CONVERT TO CENTS SO WE CAN USE INT INSTEAD OF FLOAT OR KEEP TEXT
 	currency_type TEXT NOT NULL,
 	payment_method SMALLINT NOT NULL REFERENCES gtfs_test.e_payment_methods(payment_method),
 	transfers SMALLINT NOT NULL REFERENCES gtfs_test.e_transfers(transfer),
@@ -730,7 +728,7 @@ INSERT INTO gtfs_test.e_transfers VALUES
 	(0, "no transfers permitted"),
 	(1, "riders may transfer once"),
 	(2, "riders may transfer twice"),
-	("", "unlimited transfers are permitted");
+	('', "unlimited transfers are permitted");
 
 
 
@@ -744,7 +742,7 @@ CREATE TABLE gtfs_test.real_transitland_fare_rules (
 	PRIMARY KEY(file_id, fare_id, route_id, origin_id, destination_id, contains_id)
 );
 
--- EMPTIES DEFAULT TO 0 for TRIPS.txt
+
 CREATE TABLE gtfs_test.real_transitland_trips (
 	file_id INT REFERENCES gtfs_files(file_id),
 	route_id TEXT REFERENCES real_transitland_routes(route_id) NOT NULL,
@@ -793,20 +791,19 @@ INSERT INTO gtfs_test.e_bikes_allowed VALUES
 	(2, "no bicycles allowed on this trip");
 
 
--- IF VARIABLES PICKUP AND DROP OFF TYPES ARE BLANK THEY DEFAULT TO 0
--- IF VARIBLES CONTINUOUS PICKUP AND DROP OFF AND TIMEPOINT ARE BLANK, DEFAULT TO 1
+
 CREATE TABLE gtfs_test.real_transitland_stop_times (
 	file_id INT REFERENCES gtfs_files(file_id),
 	trip_id TEXT REFERENCES real_transitland_trips(trip_id) NOT NULL,
 	arrival_time INTERVAL,
 	departure_time INTERVAL,
-	stop_id ID REFERENCES real_transitland_stops(stop_id) NOT NULL,
+	stop_id TEXT REFERENCES real_transitland_stops(stop_id) NOT NULL,
 	stop_sequence INT NOT NULL,
 	stop_headsign TEXT,
 	pickup_type SMALLINT REFERENCES gtfs_test.e_pickup_types(pickup_type),
 	drop_off_type SMALLINT REFERENCES gtfs_test.e_drop_odd_types(drop_off_type),
-	continuous_pickup REFERENCES gtfs_test.e_continuous_pickup(continuous_pickup),
-	continuous_dropoff REFERENCE gtfs_test.e_continuous_drop_off(continuous_drop_off),
+	continuous_pickup SMALLINT REFERENCES gtfs_test.e_continuous_pickup(continuous_pickup),
+	continuous_drop_off SMALLINT REFERENCES gtfs_test.e_continuous_drop_off(continuous_drop_off),
 	shape_dist_traveled FLOAT,
 	timepoint SMALLINT REFERENCES gtfs_test.e_timepoints(timepoint),
 	PRIMARY KEY(file_id, trip_id, stop_sequence)
@@ -884,7 +881,7 @@ CREATE TABLE gtfs_test.real_transitland_fare_products (
 	file_id INT REFERENCES gtfs_files(file_id),
 	fare_product_id TEXT NOT NULL,
 	fare_product_name TEXT,
-	fare_media_id ID REFERENCES real_transitland_fare_media(fare_media_id),
+	fare_media_id TEXT REFERENCES real_transitland_fare_media(fare_media_id),
 	amount NUMERIC(7,2) NOT NULL,
 	currency TEXT NOT NULL,
 	PRIMARY KEY(file_id, fare_product_id, fare_media_id)
@@ -894,7 +891,7 @@ CREATE TABLE gtfs_test.real_transitland_fare_products (
 CREATE TABLE gtfs_test.real_transitland_fare_leg_rules (
 	file_id INT REFERENCES gtfs_files(file_id),
 	leg_group_id TEXT,
-	network_id TEXT -- REFERENCES real_transitland_networks(network_id) OR REFERENCES real_transitland_routes(network_id)
+	network_id TEXT, -- REFERENCES real_transitland_networks(network_id) OR REFERENCES real_transitland_routes(network_id)
 	from_area_id TEXT REFERENCES real_transitland_areas(area_id),
 	to_area_id TEXT REFERENCES real_transitland_areas(area_id),
 	from_timeframe_group_id TEXT REFERENCES real_transitland_timeframes(timeframe_group_id),
@@ -937,7 +934,7 @@ CREATE TABLE gtfs_test.e_fare_transfer_types(
 INSERT INTO gtfs_test.e_fare_transfer_types VALUES 
 	(0, "From-leg fare_leg_rules.fare_product_id plus fare_transfer_rules.fare_product_id; A + AB"),
 	(1, "From-leg fare_leg_rules.fare_product_id plus fare_transfer_rules.fare_product_id plus to-leg fare_leg_rules.fare_product_id; A + AB + B"),
-	(2, "fare_transfer_rules.fare_product_id; AB")
+	(2, "fare_transfer_rules.fare_product_id; AB");
 
 
 
@@ -975,16 +972,27 @@ CREATE TABLE gtfs_test.real_transitland_route_networks (
 
 
 CREATE TABLE gtfs_test.real_transitland_frequencies (
-	file_id ID REFERENCES gtfs_files(file_id),
-	trip_id ID REFERENCES real_transitland_trips(trip_id) NOT NULL,
+	file_id INT REFERENCES gtfs_files(file_id),
+	trip_id TEXT REFERENCES real_transitland_trips(trip_id) NOT NULL,
 	start_time INTERVAL NOT NULL, 
 	end_time INTERVAL NOT NULL,
-	headway_secs POSITIVE INTEGER NOT NULL,
-	exact_times ENUM,
+	headway_secs INT NOT NULL,
+	exact_times SMALLINT REFERENCES gtfs_test.e_exact_times(exact_times),
 	PRIMARY KEY(file_id, trip_id, start_time)
 );
 
--- TRANSFER TYPE BLANKS DEFAULT TO 0
+
+CREATE TABLE gtfs_test.e_exact_times (
+	exact_times SMALLINT,
+	exact_times_descr TEXT
+);
+
+INSERT INTO gtfs_test.e_exact_times VALUES 
+	(0, "frequency-based trips"),
+	(1, "schedule-based trips with the exact same headway throughout the day")
+;
+
+
 CREATE TABLE gtfs_test.real_transitland_transfers (
 	file_id INT REFERENCES gtfs_files(file_id),
 	from_stop_id TEXT REFERENCES real_transitland_stops(stop_id),
@@ -1061,7 +1069,7 @@ INSERT INTO gtfs_test.is_bidirectional VALUES
 
 CREATE TABLE gtfs_test.real_transitland_levels (
 	file_id INT REFERENCES gtfs_files(file_id),
-	level_id TEXT PRIMARY KEY NOT NULL,
+	level_id TEXT NOT NULL,
 	level_index FLOAT NOT NULL,
 	level_name TEXT,
 	PRIMARY KEY(file_id, level_id)
@@ -1070,7 +1078,7 @@ CREATE TABLE gtfs_test.real_transitland_levels (
 
 CREATE TABLE gtfs_test.real_transitland_translations (
 	file_id INT REFERENCES gtfs_files(file_id),
-	table_name ENUM NO NULL, -----------------------?????
+	table_name TEXT NO NULL, -----------------------?????
 	field_name TEXT NOT NULL,
 	language TEXT NOT NULL,
 	TRANSLATION TEXT NOT NULL,
@@ -1095,7 +1103,7 @@ CREATE TABLE gtfs_test.real_transitland_feed_info (
 	PRIMARY KEY(file_id)
 );
 
--- empties default to 0's 
+
 CREATE TABLE gtfs_test.real_transitland_attributions (
 	file_id INT REFERENCES gtfs_files(file_id),
 	attribution_id TEXT,
@@ -1151,3 +1159,7 @@ SELECT * FROM gtfs_test.real_transitland_levels
 SELECT * FROM gtfs_test.real_transitland_translations
 SELECT * FROM gtfs_test.real_transitland_feed_info
 SELECT * FROM gtfs_test.real_transitland_attributions
+
+
+
+
