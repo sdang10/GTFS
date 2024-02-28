@@ -113,10 +113,10 @@ def main():
         for a in pgdb.fetchall('SELECT feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info'):
 
             # initialize agency file path with onestop_id (still missing feed_sha1)
-            afp = zip_file_path.replace('{feed_onestop_id}', a[1])
+            afp = zip_file_path.replace('{feed_onestop_id}', a[0])
 
             # get list of feeds from transitland after highest feed in data
-            r = requests.get(feed_url + a[1], params={'api_key': api_key})
+            r = requests.get(feed_url + a[0], params={'api_key': api_key})
 
             # expect 200 code from transitland instead of using r.raise_for_status()
             if r.status_code == 200:
