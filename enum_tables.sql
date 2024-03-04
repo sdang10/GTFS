@@ -117,7 +117,7 @@ CREATE TABLE gtfs_test.e_exact_times (
 
 CREATE TABLE gtfs_test.e_transfer_types(
 	transfer_type SMALLINT PRIMARY KEY,
-	transfer_type_descr
+	transfer_type_descr TEXT
 );
 -- SELECT * FROM gtfs_test.e_transfer_types
 
@@ -127,7 +127,7 @@ CREATE TABLE gtfs_test.e_pathway_modes (
 );
 -- SELECT * FROM gtfs_test.e_pathway_modes
 
-CREATE TABLE gtfs_test.e_is_bidirectonal (
+CREATE TABLE gtfs_test.e_is_bidirectional (
 	is_bidirectional SMALLINT PRIMARY KEY,
 	is_bidirectional_descr TEXT
 );
@@ -145,6 +145,7 @@ CREATE TABLE gtfs_test.e_is_role (
 -- INSERTING THE VALUES INTO THE TABLES
 
 INSERT INTO gtfs_test.e_location_types VALUES
+	(-1, 'nan'),
 	(0, 'stop or platform'),
 	(1, 'station'),
 	(2, 'entrance or exit'),
@@ -152,6 +153,7 @@ INSERT INTO gtfs_test.e_location_types VALUES
 	(4, 'boarding area');
 
 INSERT INTO gtfs_test.e_wheelchair_boardings VALUES
+	(-1, 'nan'),
 	(0, 'parentless stops: no info; 
 child stops: inherit wheelchair_boarding behavior from parent station; 
 stations entrance/exits: inherit wheelchair_boarding behavior from parent station'),
@@ -175,12 +177,14 @@ INSERT INTO gtfs_test.e_route_types VALUES
 	(12, 'Monorail. Railway in which the track consists of a single rail or a beam');
 
 INSERT INTO gtfs_test.e_continuous_pickup VALUES 
+	(-1, 'nan'),
 	(0, 'continuous stopping pickup'),
 	(1, 'no continuous stopping pickup'),
 	(2, 'must phone agency to arrange continuous stopping pickup'),
 	(3, 'must coordinate with driver to arrange continuous stopping pickup');
 
 INSERT INTO gtfs_test.e_continuous_drop_off VALUES 
+	(-1, 'nan'),
 	(0, 'continuous stopping drop off'),
 	(1, 'no continuous stopping drop off'),
 	(2, 'must phone agency to arrange continuous stopping drop off'),
@@ -196,37 +200,42 @@ INSERT INTO gtfs_test.e_exception_types VALUES
 
 INSERT INTO gtfs_test.e_payment_methods VALUES
 	(0, 'fair is paid on board'),
-	(1, 'fair must be payd before boarding');
+	(1, 'fair must be paid before boarding');
 
 INSERT INTO gtfs_test.e_transfers VALUES 
-	(0, "no transfers permitted"),
-	(1, "riders may transfer once"),
-	(2, "riders may transfer twice"),
-	('', "unlimited transfers are permitted");
+	(-1, 'nan'),
+	(0, 'no transfers permitted'),
+	(1, 'riders may transfer once'),
+	(2, 'riders may transfer twice'),
+	(99, 'riders may transfer twice');
 
 INSERT INTO gtfs_test.e_direction_ids VALUES
 	(0, 'travel in one direction (e.g. outbound travel)'),
 	(1, 'travel in the opposite direction (e.g. inbound travel)');
 
 INSERT INTO gtfs_test.e_wheelchair_accessibility VALUES
+	(-1, 'nan'),
 	(0, 'no accessibility info'),
 	(1, 'vehicle being used on this particular trip can accommodate at least one rider in a wheelchair'),
 	(2, 'no riders in wheelchairs can be accommodated on this trip');
 
 INSERT INTO gtfs_test.e_bikes_allowed VALUES
+	(-1, 'nan'),
 	(0, 'no bike info'),
 	(1, 'vehicle being used on this particular trip can accommodate at least one bicycle'),
 	(2, 'no bicycles allowed on this trip');
 
 INSERT INTO gtfs_test.e_pickup_types VALUES 
+	(-1, 'nan'),
 	(0, 'regularly_scheduled_pickup'),
 	(1, 'no pickup available'),
 	(2, 'must phone agency to arrange pickup'),
 	(3, 'must coordinate with driver to arrange pickup');
 
 INSERT INTO gtfs_test.e_drop_off_types VALUES 
+	(-1, 'nan'),
 	(0, 'regularly scheduled drop off'),
-	(1, 'no pickup available'),
+	(1, 'no drop off available'),
 	(2, 'must phone agency to arrange drop off'),
 	(3, 'must coordinate with driver to arrange drop off');
 
@@ -273,10 +282,34 @@ INSERT INTO gtfs_test.e_pathway_modes VALUES
 	(6, 'fare gate (or payment gate): A pathway that crosses into an area of the station where proof of payment is required to cross. Fare gates may separate paid areas of the station from unpaid ones, or separate different payment areas within the same station from each other. This information can be used to avoid routing passengers through stations using shortcuts that would require passengers to make unnecessary payments, like directing a passenger to walk through a subway platform to reach a busway'),
 	(7, 'exit gate: pathway exiting paid area into an unpaid area where proof of paymen is not required to cross');
 
-INSERT INTO gtfs_test.is_bidirectional VALUES 
+INSERT INTO gtfs_test.e_is_bidirectional VALUES 
 	(0, 'unidirectional pathway that can only be used from from_stop_id to to_stop_id'),
 	(1, 'bidirectional pathway that can be used in both directions');
 
 INSERT INTO gtfs_test.e_is_role VALUES 
 	(0, 'organization does not have this role'),
 	(1, 'organization does have this role');
+
+TRUNCATE TABLE gtfs_test.e_bikes_allowed;
+TRUNCATE TABLE gtfs_test.e_continuous_drop_off;
+TRUNCATE TABLE gtfs_test.e_continuous_pickup;
+TRUNCATE TABLE gtfs_test.e_direction_ids;
+TRUNCATE TABLE gtfs_test.e_drop_off_types;
+TRUNCATE TABLE gtfs_test.e_duration_limit_types;
+TRUNCATE TABLE gtfs_test.e_exact_times;
+TRUNCATE TABLE gtfs_test.e_exception_types;
+TRUNCATE TABLE gtfs_test.e_fare_media_types;
+TRUNCATE TABLE gtfs_test.e_fare_transfer_types;
+TRUNCATE TABLE gtfs_test.e_is_bidirectional;
+TRUNCATE TABLE gtfs_test.e_is_role;
+TRUNCATE TABLE gtfs_test.e_location_types;
+TRUNCATE TABLE gtfs_test.e_pathway_modes;
+TRUNCATE TABLE gtfs_test.e_payment_methods;
+TRUNCATE TABLE gtfs_test.e_pickup_types;
+TRUNCATE TABLE gtfs_test.e_route_types;
+TRUNCATE TABLE gtfs_test.e_service_availability;
+TRUNCATE TABLE gtfs_test.e_timepoints;
+TRUNCATE TABLE gtfs_test.e_transfer_types;
+TRUNCATE TABLE gtfs_test.e_transfers;
+TRUNCATE TABLE gtfs_test.e_wheelchair_accessibility;
+TRUNCATE TABLE gtfs_test.e_wheelchair_boardings;
