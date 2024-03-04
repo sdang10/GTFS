@@ -8,7 +8,7 @@ import zipfile
 import argparse
 import sys
 from urllib.parse import urljoin
-# import numpy as np
+import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
 # import json
@@ -92,6 +92,10 @@ def main():
             log.error(f'unable to connect to {pgdb.desc}! Error: {e}')
             sys.exit()
 
+        # connect to Postgres db via sqlalchemy
+        conn_string = f'postgresql://{pg_username}:{pg_password}@{pg_host}:{pg_port}/{pg_db_name}?options=-csearch_path={pg_schema}'
+        db = create_engine(conn_string) 
+        conn = db.connect() 
 
         # perform all other checks without exiting first so we can check for all errors
         xit = False
@@ -115,7 +119,7 @@ def main():
             # initialize agency file path with onestop_id (still missing feed_sha1)
             afp = zip_file_path.replace('{feed_onestop_id}', a[0])
 
-            # get list of feeds from transitland after highest feed in data
+            # get list of feeds from transitland for specific agency
             r = requests.get(feed_url + a[0], params={'api_key': api_key})
 
             # expect 200 code from transitland instead of using r.raise_for_status()
@@ -129,7 +133,7 @@ def main():
 
                     # Set file paths
                     fp = afp.replace('{feed_sha1}',f['sha1'])
-                    save_path = os.path.join(desktop_path, f"{f['sha1']}.zip")
+                    zip_path = os.path.join(desktop_path, f"{f['sha1']}.zip")
                     extract_path = os.path.join(desktop_path, f"{f['sha1']}_extracted")
 
                     # Check the fetched_at date
@@ -150,6 +154,7 @@ def main():
                         # Execute the SQL query using your database library
                         sql_query = f'INSERT INTO gtfs_files ({columns}) VALUES ({values})'
                         pgdb.query(sql_query)
+                        pgdb.cnxn.commit()
 
                         # Construct download URL
                         download_url = urljoin(dl_url.replace('{feed_version_key}', f['sha1']), f"?api_key={api_key}")
@@ -161,9 +166,9 @@ def main():
                             # Check if the request was successful (status code 200)
                             response.raise_for_status()
                             # Save the content to a local file
-                            with open(save_path, 'wb') as file:
+                            with open(zip_path, 'wb') as file:
                                 file.write(response.content)
-                            print(f"Downloaded successfully: {save_path}")
+                            print(f"Downloaded successfully: {zip_path}")
 
                         except requests.exceptions.RequestException as e:
 
@@ -172,7 +177,7 @@ def main():
                         # Unzip the downloaded file
                         try:
 
-                            with zipfile.ZipFile(save_path, 'r') as zip_ref:
+                            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                                 zip_ref.extractall(extract_path)
                             print(f"Unzipped successfully as: {extract_path}")
 
@@ -201,14 +206,6 @@ def main():
                                     file_name = filename
                                     table_name = f"transitland_{file_name}"
                                     df = pd.read_csv(file_path)
-                                    df = df.astype(str)
-                                    df['file_id'] = file_id
-
-                                    # connect to Postgres db via sqlalchemy
-                                    conn_string = f'postgresql://{pg_username}:{pg_password}@{pg_host}:{pg_port}/{pg_db_name}?options=-csearch_path={pg_schema}'
-                                    db = create_engine(conn_string) 
-                                    conn = db.connect() 
-
                                     
                                     # Get column names from the DataFrame
                                     df_columns = df.columns.tolist()
@@ -227,14 +224,14 @@ def main():
                                         print("Not including the following columns from the DataFrame as they are not present in the SQL table:")
                                         print(df_extra_columns)
 
-                                        for column in df_extra_columns:
-                                            values = df[column]
-                                            if values is not None and not values.empty:
-                                                column_name = column
+                                        # for column in df_extra_columns:
+                                        #     values = df[column]
+                                        #     if values is not None and not values.empty:
+                                        #         column_name = column
 
                                                 # Insert values into gtfs_extra_attributes table
-                                                insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{values}')")
-                                                conn.execute(insert_query)
+                                                # insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{values}')")
+                                                # conn.execute(insert_query)
 
                                         df.drop(columns=df_extra_columns, inplace=True)
 
@@ -249,7 +246,7 @@ def main():
 
                                         for column in sql_extra_columns:
 
-                                            default_value = ''  # Adjust the default value based on your requirements
+                                            default_value = np.nan  # Adjust the default value based on your requirements
                                             df[column] = default_value
                                         # print(df)
 
@@ -260,9 +257,6 @@ def main():
                                     # commit the changes made to the database
                                     conn.commit()
 
-                                    # Close the connection after interacting with the database
-                                    conn.close()
-
                                 # shutil.move(save_path, archive_file_path)
                             
                             else: 
@@ -270,6 +264,12 @@ def main():
                                 # note extra text files in the extra files table 
                                 sql_query = f"INSERT INTO gtfs_extra_files VALUES ('{file_id}', '{file}');"
                                 pgdb.query(sql_query)
+                        query = f'CALL {pg_schema}.insert_into_real_tables()'
+                        pgdb.query(query)
+                        pgdb.cnxn.commit()
+                        query = f'CALL {pg_schema}.truncate_temp_tables()'
+                        pgdb.query(query)
+                        pgdb.cnxn.commit()
 
 
     except Exception as e:
