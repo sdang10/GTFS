@@ -7,6 +7,7 @@ import datetime as dt
 import zipfile
 import argparse
 import sys
+# import warnings
 from urllib.parse import urljoin
 import numpy as np
 import pandas as pd
@@ -47,7 +48,8 @@ def main():
 
     # create logging utility class instance, add file log, and store reference to log
     logutil = LogUtil(2) #args.verbosity)
-    if args.log_dir: logutil.add_file_log(args.log_dir)
+    #if args.log_dir: 
+    logutil.add_file_log(args.log_dir)
     log = logutil.log
 
 
@@ -112,52 +114,71 @@ def main():
         # if args.input_dir:
 
         # start
-        #log.info('----- desc -----')
+        log.info('----- desc -----')
         # iterate over each agency - get agency id (0) feed endpoints (1) and latest id (2) from database
-        for a in pgdb.fetchall('SELECT feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info'):
+        for agency in pgdb.fetchall(f"SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info"):
 
             # initialize agency file path with onestop_id (still missing feed_sha1)
-            afp = zip_file_path.replace('{feed_onestop_id}', a[0])
+            afp = zip_file_path.replace('{feed_onestop_id}', agency[1])
 
             # get list of feeds from transitland for specific agency
-            r = requests.get(feed_url + a[0], params={'api_key': api_key})
+            r = requests.get(feed_url + agency[1], params={'api_key': api_key})
 
             # expect 200 code from transitland instead of using r.raise_for_status()
             if r.status_code == 200:
 
                 # get feeds and reverse list to work in chronological order
-                feeds = r.json()['feeds'][0]['feed_versions']
-                feeds.reverse()
+                feed_list_of_agency = r.json()['feeds'][0]['feed_versions']
+                feed_list_of_agency = sorted(feed_list_of_agency, key=lambda x: x['id'])
 
-                for f in feeds:
+                for feed in feed_list_of_agency:
 
                     # Set file paths
-                    fp = afp.replace('{feed_sha1}',f['sha1'])
-                    zip_path = os.path.join(desktop_path, f"{f['sha1']}.zip")
-                    extract_path = os.path.join(desktop_path, f"{f['sha1']}_extracted")
+                    fp = afp.replace('{feed_sha1}',feed['sha1'])
+                    zip_path = os.path.join(desktop_path, f"{feed['sha1']}.zip")
+                    extract_path = os.path.join(desktop_path, f"{feed['sha1']}_extracted")
 
                     # Check the fetched_at date
-                    fetched_at_date = dt.datetime.strptime(f['fetched_at'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
-                    july_1_2023 = dt.date(2023, 7, 1)
+                    fetched_at_date = dt.datetime.strptime(feed['fetched_at'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
+                    # january_1_2019 = dt.date(2019, 1, 1)
+                    # january_1_2020 = dt.date(2020, 1, 1)
+                    # january_1_2021 = dt.date(2021, 1, 1)
+                    # december_29_2019 = dt.date(2019, 12, 29)
+                    # december_30_2019 = dt.date(2019, 12, 30)
+
+                    # these are to get the april 2023 data
+                    # april_1_2023 = dt.date(2023, 4, 1)
+                    # april_30_2023 = dt.date(2023, 4, 30)
+                    # id_list = [317910, 318000, 315351, 316759, 318002, 317989, 317982, 318001, 289332, 318022]
+
 
                     # check if fetched_at date is > specified date (to only import newer feeds)
-                    if fetched_at_date >= july_1_2023:
+                    # if january_1_2019 < fetched_at_date < january_1_2020:
+                    # if fetched_at_date > dt.date(2020, 4, 3):
+                    # if (feed['id'] in id_list) or (april_1_2023 <= fetched_at_date <= april_30_2023):
+                    bad_files = [58406, 251143]  # 58406 reads csv wrong?, 251143 date attribute, not correct? 20222508
                     # check if feed id > latest_id (to only import unimported feeds)
-                    # if f['id'] > a[2]:
+                    if feed['id'] > agency[2] and feed['id'] not in bad_files:
+
                         
-                        file_id = f['id']
+                        feed_id = feed['id']
+                        log.info(f'{agency[1]}, {feed_id}, {fetched_at_date}, {feed['sha1']}')
 
                         # import the file data into gtfs files table
-                        columns = ', '.join(f.keys())
-                        values = ', '.join([f"'{value}'" for value in f.values()])
+                        columns = list(feed.keys())
+                        columns.append('agency_id')
+                        columns_string = ', '.join(columns)
+                        values = [f"'{value}'" for value in feed.values()]
+                        values.append(f"'{agency[0]}'")
+                        values_string = ', '.join(values)
 
                         # Execute the SQL query using your database library
-                        sql_query = f'INSERT INTO gtfs_files ({columns}) VALUES ({values})'
+                        sql_query = f'INSERT INTO gtfs_transitland_feeds ({columns_string}) VALUES ({values_string})'
                         pgdb.query(sql_query)
                         pgdb.cnxn.commit()
 
                         # Construct download URL
-                        download_url = urljoin(dl_url.replace('{feed_version_key}', f['sha1']), f"?api_key={api_key}")
+                        download_url = urljoin(dl_url.replace('{feed_version_key}', feed['sha1']), f"?api_key={api_key}")
 
                         # Download the feed version
                         try:
@@ -168,22 +189,22 @@ def main():
                             # Save the content to a local file
                             with open(zip_path, 'wb') as file:
                                 file.write(response.content)
-                            print(f"Downloaded successfully: {zip_path}")
+                            log.info(f"Downloaded successfully: {zip_path}")
 
                         except requests.exceptions.RequestException as e:
 
-                            print(f"Error: {e}")
+                            log.info(f"Error: {e}")
 
                         # Unzip the downloaded file
                         try:
 
                             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                                 zip_ref.extractall(extract_path)
-                            print(f"Unzipped successfully as: {extract_path}")
+                            log.info(f"Unzipped successfully as: {extract_path}")
 
                         except zipfile.BadZipFile as e:
 
-                            print(f"Error: {e}")
+                            log.info(f"Error: {e}")
 
 
                         # List all files in the folder
@@ -199,14 +220,17 @@ def main():
                                 # Check if it's a file (not a subfolder)
                                 if os.path.isfile(file_path):
 
-                                    print(f"Importing file: {file}")
+                                    log.info(f"Importing file: {file}")
                                     # Split the filename and extension
                                     filename, file_extension = os.path.splitext(file)
                                     # Save the filename without the extension as a new variable
                                     file_name = filename
-                                    table_name = f"transitland_{file_name}"
-                                    df = pd.read_csv(file_path)
+                                    table_name = f"gtfs_tl_{file_name}" 
                                     
+                                    # IF THERE ARE MORE FIELDS THAN COLUMNS IN THE CSV FOR A ROW, FLAGS A WARNING AND THE ROW WILL BE DROPPED
+
+                                    df = pd.read_csv(file_path, dtype=str, on_bad_lines='warn', header=0) 
+
                                     # Get column names from the DataFrame
                                     df_columns = df.columns.tolist()
 
@@ -221,8 +245,7 @@ def main():
                                     # Remove extra columns from DataFrame
                                     if df_extra_columns:
 
-                                        print("Not including the following columns from the DataFrame as they are not present in the SQL table:")
-                                        print(df_extra_columns)
+                                        log.info(f'Not including the following columns from the DataFrame as they are not present in the SQL table: {df_extra_columns}')
 
                                         # for column in df_extra_columns:
                                         #     values = df[column]
@@ -237,33 +260,36 @@ def main():
 
                                     else:
 
-                                        print("No extra columns found in the DataFrame.")
+                                        log.info("No extra columns found in the DataFrame.")
 
                                     if sql_extra_columns:
+                                        default_value = np.nan  # Adjust the default value based on your requirements
 
-                                        print("The following columns are missing from the DataFrame and will be defined with the default value")
-                                        print(sql_extra_columns)
+                                        log.info(f'The following columns are missing from the DataFrame and will be defined with the default value ({default_value}): {sql_extra_columns}')
 
                                         for column in sql_extra_columns:
 
-                                            default_value = np.nan  # Adjust the default value based on your requirements
                                             df[column] = default_value
-                                        # print(df)
+                                        # log.info(df)
 
                                     # imort dataframe data into postgressql
+                                    log.info(f'pushing {file} dataframe to sql')
                                     df.to_sql(table_name, con=conn, if_exists='append', index=False) 
-                                    # print(pd.read_sql(f"SELECT * FROM {table_name}", conn))
+                                    # log.info(pd.read_sql(f"SELECT * FROM {table_name}", conn))
 
                                     # commit the changes made to the database
                                     conn.commit()
+                                    log.info(f'Successfully pushed {file} dataframe to sql')
 
                                 # shutil.move(save_path, archive_file_path)
                             
                             else: 
                                 
                                 # note extra text files in the extra files table 
-                                sql_query = f"INSERT INTO gtfs_extra_files VALUES ('{file_id}', '{file}');"
+                                sql_query = f"INSERT INTO gtfs_tl_extra_files VALUES ('{feed_id}', '{file}');"
                                 pgdb.query(sql_query)
+                                log.info(f'Updated gtfs_extra_files with {feed_id} and {file}')
+
                         query = f'CALL {pg_schema}.insert_into_real_tables()'
                         pgdb.query(query)
                         pgdb.cnxn.commit()
