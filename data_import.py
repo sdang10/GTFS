@@ -156,9 +156,9 @@ def main():
                     # if january_1_2019 < fetched_at_date < january_1_2020:
                     # if fetched_at_date > dt.date(2020, 4, 3):
                     # if (feed['id'] in id_list) or (april_1_2023 <= fetched_at_date <= april_30_2023):
-                    bad_files = [58406, 251143]  # 58406 reads csv wrong?, 251143 date attribute, not correct? 20222508
+                    bad_files = [58406]  # 58406 reads csv wrong?, 251143 date attribute, not correct? 20222508
                     # check if feed id > latest_id (to only import unimported feeds)
-                    if feed['id'] > agency[2] and feed['id'] not in bad_files:
+                    if feed['id'] > agency[2] or feed['id'] in bad_files:
 
                         
                         feed_id = feed['id']
@@ -229,65 +229,68 @@ def main():
                                     
                                     # IF THERE ARE MORE FIELDS THAN COLUMNS IN THE CSV FOR A ROW, FLAGS A WARNING AND THE ROW WILL BE DROPPED
 
-                                    try: 
-                                        df = pd.read_csv(file_path, dtype=str, on_bad_lines='warn', header=0) 
+                                    # try: 
+                                    df = pd.read_csv(file_path, header=0)
+                                    log.info(df)
 
-                                        # Get column names from the DataFrame
-                                        df_columns = df.columns.tolist()
+                                    
 
-                                        # Get column names from the SQL table
-                                        sql_columns = pd.read_sql(f"SELECT * FROM {table_name} LIMIT 0", conn).columns.tolist()
+                                    # Get column names from the DataFrame
+                                    df_columns = df.columns.tolist()
 
-                                        # Find columns in DataFrame that are not present in SQL table
-                                        df_extra_columns = set(df_columns) - set(sql_columns)
-                                        # Find columns in SQL table that are not present in DataFrame
-                                        sql_extra_columns = set(sql_columns) - set(df_columns)
+                                    # Get column names from the SQL table
+                                    sql_columns = pd.read_sql(f"SELECT * FROM {table_name} LIMIT 0", conn).columns.tolist()
 
-                                        # Remove extra columns from DataFrame
-                                        if df_extra_columns:
+                                    # Find columns in DataFrame that are not present in SQL table
+                                    df_extra_columns = set(df_columns) - set(sql_columns)
+                                    # Find columns in SQL table that are not present in DataFrame
+                                    sql_extra_columns = set(sql_columns) - set(df_columns)
 
-                                            log.info(f'Not including the following columns from the DataFrame as they are not present in the SQL table: {df_extra_columns}')
+                                    # Remove extra columns from DataFrame
+                                    if df_extra_columns:
 
-                                            # for column in df_extra_columns:
-                                            #     values = df[column]
-                                            #     if values is not None and not values.empty:
-                                            #         column_name = column
+                                        log.info(f'Not including the following columns from the DataFrame as they are not present in the SQL table: {df_extra_columns}')
 
-                                                    # Insert values into gtfs_extra_attributes table
-                                                    # insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{values}')")
-                                                    # conn.execute(insert_query)
+                                        # for column in df_extra_columns:
+                                        #     values = df[column]
+                                        #     if values is not None and not values.empty:
+                                        #         column_name = column
 
-                                            df.drop(columns=df_extra_columns, inplace=True)
+                                                # Insert values into gtfs_extra_attributes table
+                                                # insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{values}')")
+                                                # conn.execute(insert_query)
 
-                                        else:
+                                        df.drop(columns=df_extra_columns, inplace=True)
 
-                                            log.info("No extra columns found in the DataFrame.")
+                                    else:
 
-                                        if sql_extra_columns:
-                                            default_value = np.nan  # Adjust the default value based on your requirements
+                                        log.info("No extra columns found in the DataFrame.")
 
-                                            log.info(f'The following columns are missing from the DataFrame and will be defined with the default value ({default_value}): {sql_extra_columns}')
+                                    if sql_extra_columns:
+                                        default_value = np.nan  # Adjust the default value based on your requirements
 
-                                            for column in sql_extra_columns:
+                                        log.info(f'The following columns are missing from the DataFrame and will be defined with the default value ({default_value}): {sql_extra_columns}')
 
-                                                df[column] = default_value
-                                            # log.info(df)
+                                        for column in sql_extra_columns:
 
-                                            # imort dataframe data into postgressql
-                                            log.info(f'pushing {file} dataframe to sql')
-                                            df.to_sql(table_name, con=conn, if_exists='append', index=False) 
-                                            # log.info(pd.read_sql(f"SELECT * FROM {table_name}", conn))
+                                            df[column] = default_value
+                                        # log.info(df)
 
-                                            # commit the changes made to the database
-                                            conn.commit()
-                                            log.info(f'Successfully pushed {file} dataframe to sql')
-                                            
-                                    except Exception as e:
+                                    # imort dataframe data into postgressql
+                                    log.info(f'pushing {file} dataframe to sql')
+                                    df.to_sql(table_name, con=conn, if_exists='append', index=False) 
+                                    # log.info(pd.read_sql(f"SELECT * FROM {table_name}", conn))
 
-                                        # Print the error message
-                                        print(f"Error reading {file_name}: {str(e)}")
-                                        # Move on to the next CSV file
-                                        continue
+                                    # commit the changes made to the database
+                                    conn.commit()
+                                    log.info(f'Successfully pushed {file} dataframe to sql')
+
+                                    # except Exception as e:
+
+                                    #     # Print the error message
+                                    #     log.info(f"Error reading {file_name}: {str(e)}")
+                                    #     # Move on to the next CSV file
+                                    #     continue
 
                                 # shutil.move(save_path, archive_file_path)
                             
