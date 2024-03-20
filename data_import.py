@@ -1,10 +1,8 @@
+#! /usr/bin/env python3
 """-----------------------------------------------------------------------------
 SCRIPT: shane_gtfs_static.py
 AUTHOR: Shane Khaykham Dang <dangit17@uw.edu>
 DESCRIPTION:  This script runs a data import of gtfs files from transitland to a database in postgres
-
-DEPENDENCIES:
-
 
 RELEASE HISTORY:
   v  1.0    2024-03-18  initial code development (first bulk push to db)
@@ -151,7 +149,7 @@ def main():
                     # if fetched_at_date > dt.date(2020, 4, 3):
                     # if (feed_id in id_list) or (april_1_2023 <= fetched_at_date <= april_30_2023):
 
-                    bad_files = [58406]  # 58406 reads csv wrong?, 251143 date attribute, not correct? 20222508
+                    bad_files = [58406]  # 58406 more columns than column names, 251143 date attribute not in range 20222508
 
                     # check if feed id > latest_id (to only import unimported feeds)
                     if feed_id > agency[2] or feed_id in bad_files:
@@ -172,7 +170,7 @@ def main():
                         pgdb.cnxn.commit()
 
                         # Construct download URL
-                        dl_url = urljoin(download_url.replace('{feed_version_key}', feed['sha1']), f"?api_key={api_key}")
+                        dl_url = urljoin(download_url.replace('{feed_version_key}', str(feed['id'])), f"?api_key={api_key}")
 
                         # Set file paths
                         zip_path = os.path.join(desktop_path, f"{feed_id}.zip")
