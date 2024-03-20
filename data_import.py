@@ -1,4 +1,15 @@
-# INSERT DOCUMENTATION HERE
+"""-----------------------------------------------------------------------------
+SCRIPT: shane_gtfs_static.py
+AUTHOR: Shane Khaykham Dang <dangit17@uw.edu>
+DESCRIPTION:  This script runs a data import of gtfs files from transitland to a database in postgres
+
+DEPENDENCIES:
+
+
+RELEASE HISTORY:
+  v  1.0    2024-03-18  initial code development (first bulk push to db)
+
+-----------------------------------------------------------------------------"""
 
 
 # system imports
@@ -36,8 +47,10 @@ desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
 
 
 def main():
+    # setup catch on warnings for exception clauses
     warnings.filterwarnings("error")
 
+    # parser setup
     parser = argparse.ArgumentParser(description='desc')
     parser.add_argument('config_file', default='shane_gtfs_static_config.ini', help='location of configuration file', metavar='Config File')
     parser.add_argument('log_dir', default='logs', help='directory where log files are saved', metavar='Log Directory')
@@ -46,18 +59,15 @@ def main():
     parser.add_argument('-i', '--input_dir', default='', help='directory containing input csv files', metavar='Input Directory')
     args = parser.parse_args()
 
-
     # create logging utility class instance, add file log, and store reference to log
     logutil = LogUtil(2) #args.verbosity)
     #if args.log_dir: 
     logutil.add_file_log(args.log_dir)
     log = logutil.log
 
-
     # create configuration utility class instance, parse config file and exit on failure
     cfgutil = ConfigUtil(log)
     if not cfgutil.load(args.config_file): sys.exit()
-
 
     # local variables
     pg_username = cfgutil.get_item('db_postgres', 'username')
@@ -70,32 +80,28 @@ def main():
     api_key = cfgutil.get_item('feed_info','api_key')
     api_url = cfgutil.get_item('feed_info','api_endpoint')
     feed_url = api_url + cfgutil.get_item('feed_info','feed_list')
-    dl_url = api_url + cfgutil.get_item('feed_info','feed_download')
+    download_url = api_url + cfgutil.get_item('feed_info','feed_download')
     # file metadata variables
     file_data_variables = cfgutil.get_item('data_tracking', 'gtfs_file_data_variables').split(',') # Read gtfs_file_data_variables as a list
     # transitland allowables
     allowed_files = cfgutil.get_item('data_tracking', 'allowed_files').split(',') # Read allowed_files as a list
-    # file path
-    zip_file_path = cfgutil.get_item('feed_info','file_path')
+    # file paths
+    # zip_dl_url = cfgutil.get_item('feed_info','file_path')
     # archive_file_path = '/shane_gtfs_static_archive/'
     
-    # dt_fmt = '%Y-%m-%d'
-    # orca_start = dt.datetime.strptime('2019-01-01',dt_fmt)
-
-
     try:
 
         # create postgres database instance
-        pgdb = PostgresDB(log, desc='dashboard postgres database')
         connection_params = cfgutil.get_section('db_postgres')
         log.info(f'Attempting to connect with parameters: {connection_params}')
+        pgdb = PostgresDB(log, desc='dashboard postgres database')
 
-        # connect to postgres database
+        # check postgres database connection
         if not pgdb.open(cfgutil, 'db_postgres'):
             log.error(f'unable to connect to {pgdb.desc}! Error: {e}')
             sys.exit()
 
-        # connect to Postgres db via sqlalchemy
+        # connect to Postgres db via sqlalchemy for df.to_sql
         conn_string = f'postgresql://{pg_username}:{pg_password}@{pg_host}:{pg_port}/{pg_db_name}?options=-csearch_path={pg_schema}'
         db = create_engine(conn_string) 
         conn = db.connect() 
@@ -119,10 +125,7 @@ def main():
         # iterate over each agency - get agency id (0) feed endpoints (1) and latest id (2) from database
         for agency in pgdb.fetchall(f"SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info"):
 
-            # initialize agency file path with onestop_id (still missing feed_sha1)
-            afp = zip_file_path.replace('{feed_onestop_id}', agency[1])
-
-            # get list of feeds from transitland for specific agency
+            # get list of feeds from transitland for agency
             r = requests.get(feed_url + agency[1], params={'api_key': api_key})
 
             # expect 200 code from transitland instead of using r.raise_for_status()
@@ -132,40 +135,30 @@ def main():
                 feed_list_of_agency = r.json()['feeds'][0]['feed_versions']
                 feed_list_of_agency = sorted(feed_list_of_agency, key=lambda x: x['id'])
 
+                # iterate over all the feeds in the feed list of agency
                 for feed in feed_list_of_agency:
 
-                    # Set file paths
-                    fp = afp.replace('{feed_sha1}',feed['sha1'])
-                    zip_path = os.path.join(desktop_path, f"{feed['sha1']}.zip")
-                    extract_path = os.path.join(desktop_path, f"{feed['sha1']}_extracted")
-
-                    # Check the fetched_at date
+                    # define feed variables
+                    feed_id = feed['id']
                     fetched_at_date = dt.datetime.strptime(feed['fetched_at'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
-                    # january_1_2019 = dt.date(2019, 1, 1)
-                    # january_1_2020 = dt.date(2020, 1, 1)
-                    # january_1_2021 = dt.date(2021, 1, 1)
-                    # december_29_2019 = dt.date(2019, 12, 29)
-                    # december_30_2019 = dt.date(2019, 12, 30)
 
                     # these are to get the april 2023 data
                     # april_1_2023 = dt.date(2023, 4, 1)
                     # april_30_2023 = dt.date(2023, 4, 30)
-                    # id_list = [317910, 318000, 315351, 316759, 318002, 317989, 317982, 318001, 289332, 318022]
-
-
+                    # id_list = [317910, 318000, 315351, 316759, 318002, 317989, 317982, 318001, 289332, 318022] chunk of the seattlechildrens data that has repeating data over a period of time
                     # check if fetched_at date is > specified date (to only import newer feeds)
                     # if january_1_2019 < fetched_at_date < january_1_2020:
                     # if fetched_at_date > dt.date(2020, 4, 3):
-                    # if (feed['id'] in id_list) or (april_1_2023 <= fetched_at_date <= april_30_2023):
+                    # if (feed_id in id_list) or (april_1_2023 <= fetched_at_date <= april_30_2023):
+
                     bad_files = [58406]  # 58406 reads csv wrong?, 251143 date attribute, not correct? 20222508
+
                     # check if feed id > latest_id (to only import unimported feeds)
-                    if feed['id'] > agency[2] or feed['id'] in bad_files:
+                    if feed_id > agency[2] or feed_id in bad_files:
 
-                        
-                        feed_id = feed['id']
-                        log.info(f'{agency[1]}, {feed_id}, {fetched_at_date}, {feed['sha1']}')
+                        log.info(f'{agency[1]}, {feed_id}, {fetched_at_date}')
 
-                        # import the file data into gtfs files table
+                        # retrieve feed data in list format for columns and values in feed table
                         columns = list(feed.keys())
                         columns.append('agency_id')
                         columns_string = ', '.join(columns)
@@ -173,18 +166,22 @@ def main():
                         values.append(f"'{agency[0]}'")
                         values_string = ', '.join(values)
 
-                        # Execute the SQL query using your database library
+                        # import the feed data into transitland_feeds table
                         sql_query = f'INSERT INTO gtfs_transitland_feeds ({columns_string}) VALUES ({values_string})'
                         pgdb.query(sql_query)
                         pgdb.cnxn.commit()
 
                         # Construct download URL
-                        download_url = urljoin(dl_url.replace('{feed_version_key}', feed['sha1']), f"?api_key={api_key}")
+                        dl_url = urljoin(download_url.replace('{feed_version_key}', feed['sha1']), f"?api_key={api_key}")
+
+                        # Set file paths
+                        zip_path = os.path.join(desktop_path, f"{feed_id}.zip")
+                        extracted_path = os.path.join(desktop_path, f"{feed_id}_extracted")
 
                         # Download the feed version
                         try:
 
-                            response = requests.get(download_url)
+                            response = requests.get(dl_url)
                             # Check if the request was successful (status code 200)
                             response.raise_for_status()
                             # Save the content to a local file
@@ -200,32 +197,29 @@ def main():
                         try:
 
                             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                                zip_ref.extractall(extract_path)
-                            log.info(f"Unzipped successfully as: {extract_path}")
+                                zip_ref.extractall(extracted_path)
+                            log.info(f"Unzipped successfully as: {extracted_path}")
 
                         except zipfile.BadZipFile as e:
 
                             log.info(f"Error: {e}")
 
-
                         # List all files in the folder
-                        file_list = os.listdir(extract_path)
-                        # Iterate through each file in the folder
+                        file_list = os.listdir(extracted_path)
 
+                        # Iterate through each file in the folder
                         for file in file_list:
 
                             if file in allowed_files:
                         
-                                file_path = os.path.join(extract_path, file)
+                                file_path = os.path.join(extracted_path, file)
                                 
                                 # Check if it's a file (not a subfolder)
                                 if os.path.isfile(file_path):
 
                                     log.info(f"Importing file: {file}")
                                     # Split the filename and extension
-                                    filename, file_extension = os.path.splitext(file)
-                                    # Save the filename without the extension as a new variable
-                                    file_name = filename
+                                    file_name, file_extension = os.path.splitext(file)
                                     table_name = f"gtfs_tl_{file_name}" 
                                     
                                     # IF THERE ARE MORE FIELDS THAN COLUMNS IN THE CSV FOR A ROW, FLAGS A WARNING AND THE ROW WILL BE DROPPED
@@ -234,15 +228,12 @@ def main():
 
                                         df = pd.read_csv(file_path, dtype=str, delimiter=',', header=0, index_col=False, on_bad_lines='warn')
 
-                                        # Get column names from the DataFrame
+                                        # Get column names from the DataFrame and from SQL table
                                         df_columns = df.columns.tolist()
-
-                                        # Get column names from the SQL table
                                         sql_columns = pd.read_sql(f"SELECT * FROM {table_name} LIMIT 0", conn).columns.tolist()
 
-                                        # Find columns in DataFrame that are not present in SQL table
+                                        # identify column mismatching
                                         df_extra_columns = set(df_columns) - set(sql_columns)
-                                        # Find columns in SQL table that are not present in DataFrame
                                         sql_extra_columns = set(sql_columns) - set(df_columns)
 
                                         # Remove extra columns from DataFrame
@@ -255,7 +246,7 @@ def main():
                                             #     if values is not None and not values.empty:
                                             #         column_name = column
 
-                                                    # Insert values into gtfs_extra_attributes table
+                                                    # Insert values for the extra columns into gtfs_extra_attributes table
                                                     # insert_query = text(f"INSERT INTO gtfs_extra_attributes (file_id, file_name, column_name, value) VALUES ('{file_id}', '{file_name}', '{column_name}', '{values}')")
                                                     # conn.execute(insert_query)
 
@@ -268,25 +259,22 @@ def main():
                                         if sql_extra_columns:
                                             default_value = np.nan  # Adjust the default value based on your requirements
 
-                                            log.info(f'The following columns are missing from the DataFrame and will be defined with the default value ({default_value}): {sql_extra_columns}')
+                                            log.info(f'Columns missing from the DataFrame that will be defined with default value ({default_value}): {sql_extra_columns}')
 
                                             for column in sql_extra_columns:
 
                                                 df[column] = default_value
-                                            # log.info(df)
 
                                         # imort dataframe data into postgressql
                                         log.info(f'pushing {file} dataframe to sql')
                                         df.to_sql(table_name, con=conn, if_exists='append', index=False) 
                                         # log.info(pd.read_sql(f"SELECT * FROM {table_name}", conn))
-
-                                        # commit the changes made to the database
                                         conn.commit()
                                         log.info(f'Successfully pushed {file} dataframe to sql')
 
                                     except Warning as w:
 
-                                        # Print the error message
+                                        # log error message
                                         log.info(f"Error reading {file_name}: {str(w)}")
 
                                         # in the case a warning was raised, truncate the temp table so the real table transfer does not cause an error
@@ -300,12 +288,13 @@ def main():
                                 # note extra text files in the extra files table 
                                 sql_query = f"INSERT INTO gtfs_tl_extra_files VALUES ('{feed_id}', '{file}');"
                                 pgdb.query(sql_query)
+                                pgdb.cnxn.commit()
                                 log.info(f'Updated gtfs_extra_files with {feed_id} and {file}')
 
-                        query = f'CALL {pg_schema}.insert_into_real_tables()'
+                        query = f'CALL insert_into_real_tables()'
                         pgdb.query(query)
                         pgdb.cnxn.commit()
-                        query = f'CALL {pg_schema}.truncate_temp_tables()'
+                        query = f'CALL truncate_temp_tables()'
                         pgdb.query(query)
                         pgdb.cnxn.commit()
 
