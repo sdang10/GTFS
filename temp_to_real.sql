@@ -48,6 +48,22 @@ $$;
 --$$;
 -- CALL _import.create_real_gtfs_extra_attributes_table()
 
+CREATE OR REPLACE PROCEDURE _import.create_real_gtfs_bad_feeds_table()
+LANGUAGE plpgsql
+AS $$
+BEGIN 
+	
+	INSERT INTO gtfs.tl_bad_feeds (
+		id
+	)
+	SELECT DISTINCT 
+		CAST(id AS INT)
+	FROM _import.gtfs_tl_bad_feeds;
+	
+END;
+$$;
+-- CALL _import.create_real_gtfs_bad_feeds_table()
+
 CREATE OR REPLACE PROCEDURE _import.create_real_gtfs_extra_files_table()
 LANGUAGE plpgsql
 AS $$
@@ -64,7 +80,7 @@ BEGIN
 
 END;
 $$;
-
+-- CALL _import.create_real_gtfs_extra_files_table()
 
 CREATE OR REPLACE PROCEDURE _import.create_real_agency_table()
 LANGUAGE plpgsql
@@ -998,6 +1014,7 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
 
+	CALL _import.create_real_gtfs_bad_feeds_table();
     CALL _import.create_real_gtfs_feeds_table();
 --	CALL _import.create_real_gtfs_extra_attributes_table();
 	CALL _import.create_real_gtfs_extra_files_table();
@@ -1066,6 +1083,7 @@ BEGIN
 	TRUNCATE TABLE _import.gtfs_tl_translations;
 	TRUNCATE TABLE _import.gtfs_tl_extra_files;
 	TRUNCATE TABLE _import.gtfs_transitland_feeds;
+	TRUNCATE TABLE _import.gtfs_tl_bad_feeds;
 	
 END; 
 $$;
