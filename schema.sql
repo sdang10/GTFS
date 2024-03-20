@@ -6,6 +6,41 @@ SELECT * FROM gtfs.v_transitland_feed_info;
 
 -- TEMP TABLES FOR A STRAIGHT FORWARD IMPORT
 
+--DROP TABLE _import.gtfs_extra_files;
+--DROP TABLE _import.gtfs_extra_attributes;
+--DROP TABLE _import.gtfs_transitland_feeds;
+
+--DROP TABLE _import.gtfs_tl_stop_times; 
+--DROP TABLE _import.gtfs_tl_trips;
+--DROP TABLE _import.gtfs_tl_shapes;
+--DROP TABLE _import.gtfs_tl_calendar_dates;
+--DROP TABLE _import.gtfs_tl_calendar;
+--DROP TABLE _import.gtfs_tl_routes;
+--DROP TABLE _import.gtfs_tl_stops;
+--DROP TABLE _import.gtfs_tl_agency;
+--DROP TABLE _import.gtfs_tl_feed_info;
+--DROP TABLE _import.gtfs_tl_transfers;
+--DROP TABLE _import.gtfs_tl_fare_attributes;
+--DROP TABLE _import.gtfs_tl_fare_rules;
+--DROP TABLE _import.gtfs_tl_frequencies;
+--DROP TABLE _import.gtfs_tl_areas;
+--DROP TABLE _import.gtfs_tl_timeframes;
+--DROP TABLE _import.gtfs_tl_fare_media;
+--DROP TABLE _import.gtfs_tl_fare_products;
+--DROP TABLE _import.gtfs_tl_fare_leg_rules;
+--DROP TABLE _import.gtfs_tl_fare_transfer_rules;
+--DROP TABLE _import.gtfs_tl_stop_areas;
+--DROP TABLE _import.gtfs_tl_networks;
+--DROP TABLE _import.gtfs_tl_route_networks;
+--DROP TABLE _import.gtfs_tl_pathways;
+--DROP TABLE _import.gtfs_tl_levels;
+--DROP TABLE _import.gtfs_tl_attributions;
+--DROP TABLE _import.gtfs_tl_translations;
+
+
+CREATE TABLE _import.gtfs_tl_bad_feeds (
+	id TEXT
+);
 
 CREATE TABLE _import.gtfs_transitland_feeds (
 	id TEXT,
@@ -642,6 +677,11 @@ INSERT INTO gtfs.e_is_role VALUES
 -- SELECT * FROM _import.gtfs_extra_attributes
 -- SELECT * FROM gtfs.real_gtfs_extra_attributes 
 
+CREATE TABLE gtfs.tl_bad_feeds (
+	id INT NOT NULL,
+	PRIMARY KEY(id)
+);
+
 CREATE TABLE gtfs.tl_extra_files (
 	feed_id INT NOT NULL,-- INT NOT NULL REFERENCES gtfs.transitland_feeds(feed_id),
 	file_name TEXT
@@ -819,6 +859,7 @@ CREATE TABLE gtfs.tl_calendar_dates (
 -- SELECT * FROM _import.gtfs_tl_calendar_dates
 -- SELECT * FROM gtfs.tl_calendar_dates
 
+SELECT count(*) FROM gtfs.transitland_feeds
 CREATE TABLE gtfs.tl_fare_attributes (
 	feed_id INT NOT NULL, -- INT NOT NULL REFERENCES gtfs.transitland_feeds(feed_id),
 	fare_id TEXT NOT NULL,
@@ -1048,3 +1089,4 @@ CREATE TABLE gtfs.tl_attributions (
 );
 -- SELECT * FROM _import.gtfs_tl_attributions
 -- SELECT * FROM gtfs.tl_attributions
+
