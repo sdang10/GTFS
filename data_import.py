@@ -9,6 +9,8 @@ RELEASE HISTORY:
 
 -----------------------------------------------------------------------------"""
 
+# when parse error, keep feed data in transitland feeds, but scrap the other data 
+# make gtfs.tl_bad_feeds bad feeds table with JUST FILE ID
 
 # system imports
 import os
@@ -205,24 +207,23 @@ def main():
                         # List all files in the folder
                         file_list = os.listdir(extracted_path)
 
-                        # Iterate through each file in the folder
-                        for file in file_list:
+                        # if we encounter a warning, abort this feed and move on to the next one
+                        try:
 
-                            if file in allowed_files:
-                        
-                                file_path = os.path.join(extracted_path, file)
-                                
-                                # Check if it's a file (not a subfolder)
-                                if os.path.isfile(file_path):
+                            # Iterate through each file in the folder
+                            for file in file_list:
 
-                                    log.info(f"Importing file: {file}")
-                                    # Split the filename and extension
-                                    file_name, file_extension = os.path.splitext(file)
-                                    table_name = f"gtfs_tl_{file_name}" 
+                                if file in allowed_files:
+                            
+                                    file_path = os.path.join(extracted_path, file)
                                     
-                                    # IF THERE ARE MORE FIELDS THAN COLUMNS IN THE CSV FOR A ROW, FLAGS A WARNING AND THE ROW WILL BE DROPPED
+                                    # Check if it's a file (not a subfolder)
+                                    if os.path.isfile(file_path):
 
-                                    try: 
+                                        log.info(f"Importing file: {file}")
+                                        # Split the filename and extension
+                                        file_name, file_extension = os.path.splitext(file)
+                                        table_name = f"gtfs_tl_{file_name}" 
 
                                         df = pd.read_csv(file_path, dtype=str, delimiter=',', header=0, index_col=False, on_bad_lines='warn')
 
@@ -269,25 +270,32 @@ def main():
                                         # log.info(pd.read_sql(f"SELECT * FROM {table_name}", conn))
                                         conn.commit()
                                         log.info(f'Successfully pushed {file} dataframe to sql')
-
-                                    except Warning as w:
-
-                                        # log error message
-                                        log.info(f"Error reading {file_name}: {str(w)}")
-
-                                        # in the case a warning was raised, truncate the temp table so the real table transfer does not cause an error
-                                        # Move on to the next CSV file
-                                        continue
-
-                                # shutil.move(save_path, archive_file_path)
-                            
-                            else: 
+                                    
+                                    else: 
                                 
-                                # note extra text files in the extra files table 
-                                sql_query = f"INSERT INTO gtfs_tl_extra_files VALUES ('{feed_id}', '{file}');"
-                                pgdb.query(sql_query)
-                                pgdb.cnxn.commit()
-                                log.info(f'Updated gtfs_extra_files with {feed_id} and {file}')
+                                        # note extra text files in the extra files table 
+                                        sql_query = f"INSERT INTO gtfs_tl_extra_files VALUES ('{feed_id}', '{file}');"
+                                        pgdb.query(sql_query)
+                                        pgdb.cnxn.commit()
+                                        log.info(f'Updated gtfs_extra_files with {feed_id} and {file}')
+
+                        except Warning as w:
+
+                            # log error message
+                            log.info(f"Error reading {file_name}: {str(w)}")
+
+                            # in the case a warning was raised, truncate import tables
+                            query = f'CALL truncate_temp_tables()'
+                            pgdb.query(query)
+                            pgdb.cnxn.commit()
+                            query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
+                            pgdb.query(query)
+                            pgdb.cnxn.commit()
+                            # Move on to the next CSV file
+                            continue
+
+                        # shutil.move(extracted_path, archive_file_path)
+                            
 
                         query = f'CALL insert_into_real_tables()'
                         pgdb.query(query)
