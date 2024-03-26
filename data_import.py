@@ -23,12 +23,14 @@ from urllib.parse import urljoin
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
+import colorama
+from colorama import Fore, Style
 # import json
 # import shutil
 
 # external module imports
 import requests
-# import psycopg2
+import psycopg2
 
 # import class definitions
 from shane_pyutils.logutil import LogUtil
@@ -45,8 +47,19 @@ cfgutil = None
 pgdb = None
 desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
 
+def error_handling(feed_id):
+    # in the case a warning was raised, truncate import tables
+        query = f'CALL truncate_temp_tables()'
+        pgdb.query(query)
+        pgdb.cnxn.commit()
+        query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
+        pgdb.query(query)
+        pgdb.cnxn.commit()
+        # Move on to the next CSV file
+
 
 def main():
+    colorama.init()
     # setup catch on warnings for exception clauses
     warnings.filterwarnings("error")
 
@@ -121,9 +134,9 @@ def main():
         # if args.input_dir:
 
         # start
-        log.info('----- desc -----')
+        log.info('---------- desc ----------')
         # iterate over each agency - get agency id (0) feed endpoints (1) and latest id (2) from database
-        for agency in pgdb.fetchall(f"SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info"):
+        for agency in pgdb.fetchall(f"SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info OFFSET 9 LIMIT 1"):
 
             # get list of feeds from transitland for agency
             r = requests.get(feed_url + agency[1], params={'api_key': api_key})
@@ -145,16 +158,17 @@ def main():
                     # these are to get the april 2023 data
                     # april_1_2023 = dt.date(2023, 4, 1)
                     # april_30_2023 = dt.date(2023, 4, 30)
-                    # id_list = [317910, 318000, 315351, 316759, 318002, 317989, 317982, 318001, 289332, 318022] chunk of the seattlechildrens data that has repeating data over a period of time
+                    # id_list = [44824 december 29 2019 - april 2020] chunk of the seattlechildrens data that has repeating data over a period of time
                     # check if fetched_at date is > specified date (to only import newer feeds)
                     # if january_1_2019 < fetched_at_date < january_1_2020:
-                    # if fetched_at_date > dt.date(2020, 4, 3):
+                    # if fetched_at_date > dt.date(2019, 10, 1):
                     # if (feed_id in id_list) or (april_1_2023 <= fetched_at_date <= april_30_2023):
 
-                    bad_files = [58406]  # 58406 more columns than column names, 251143 date attribute not in range 20222508
+                    # bad_feeds = [58406, 251143, 317910, 318000]  # 58406 more columns than column names, 251143 date attribute not in range 20222508
+
 
                     # check if feed id > latest_id (to only import unimported feeds)
-                    if feed_id > agency[2] or feed_id in bad_files:
+                    if feed_id > agency[2]: 
 
                         log.info(f'{agency[1]}, {feed_id}, {fetched_at_date}')
 
@@ -172,7 +186,7 @@ def main():
                         pgdb.cnxn.commit()
 
                         # Construct download URL
-                        dl_url = urljoin(download_url.replace('{feed_version_key}', str(feed['id'])), f"?api_key={api_key}")
+                        dl_url = urljoin(download_url.replace('{feed_version_key}', str(feed['sha1'])), f"?api_key={api_key}")
 
                         # Set file paths
                         zip_path = os.path.join(desktop_path, f"{feed_id}.zip")
@@ -191,7 +205,7 @@ def main():
 
                         except requests.exceptions.RequestException as e:
 
-                            log.info(f"Error: {e}")
+                            log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
 
                         # Unzip the downloaded file
                         try:
@@ -202,7 +216,7 @@ def main():
 
                         except zipfile.BadZipFile as e:
 
-                            log.info(f"Error: {e}")
+                            log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
 
                         # List all files in the folder
                         file_list = os.listdir(extracted_path)
@@ -282,7 +296,7 @@ def main():
                         except Warning as w:
 
                             # log error message
-                            log.info(f"Error reading {file_name}: {str(w)}")
+                            log.info(f"{Fore.RED}Error reading {file_name}: {str(w)}{Style.RESET_ALL}")
 
                             # in the case a warning was raised, truncate import tables
                             query = f'CALL truncate_temp_tables()'
@@ -296,13 +310,37 @@ def main():
 
                         # shutil.move(extracted_path, archive_file_path)
                             
+                        try: 
 
-                        query = f'CALL insert_into_real_tables()'
-                        pgdb.query(query)
-                        pgdb.cnxn.commit()
-                        query = f'CALL truncate_temp_tables()'
-                        pgdb.query(query)
-                        pgdb.cnxn.commit()
+                            query = f'CALL insert_into_real_tables()'
+                            pgdb.query(query)
+
+                        except psycopg2.Error as e:
+
+                            pgdb.cnxn.rollback()
+                            log.info(f"{Fore.RED}Error reading {file_name}: {str(e)}{Style.RESET_ALL}")
+
+                            # in the case a error was raised, truncate import tables
+                            query = f'CALL truncate_temp_tables()'
+                            pgdb.query(query)
+                            pgdb.cnxn.commit()
+                            query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
+                            pgdb.query(query)
+                            query = f"CALL create_real_gtfs_bad_feeds_table()"
+                            pgdb.query(query)
+                            # Move on to the next CSV file
+                            continue
+
+                        finally:
+                            pgdb.cnxn.commit()
+                            query = f'CALL truncate_temp_tables()'
+                            pgdb.query(query)
+                            pgdb.cnxn.commit()
+                            log.info('')
+                            log.info('----- break -----')
+                            log.info('')
+
+
 
 
     except Exception as e:
@@ -314,7 +352,7 @@ def main():
     finally:
         pgdb.close(True)
         # close the log file with final message
-        logutil.remove_file_log('script completed')
+        logutil.remove_file_log('---------- script completed ----------')
 
     
 
