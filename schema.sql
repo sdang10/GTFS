@@ -681,6 +681,8 @@ CREATE TABLE gtfs.tl_bad_feeds (
 	id INT NOT NULL,
 	PRIMARY KEY(id)
 );
+-- SELECT * FROM _import.gtfs_tl_bad_feeds
+-- SELECT * FROM gtfs.tl_bad_feeds
 
 CREATE TABLE gtfs.tl_extra_files (
 	feed_id INT NOT NULL,-- INT NOT NULL REFERENCES gtfs.transitland_feeds(feed_id),
