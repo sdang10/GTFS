@@ -136,7 +136,7 @@ def main():
         # start
         log.info('---------- desc ----------')
         # iterate over each agency - get agency id (0) feed endpoints (1) and latest id (2) from database
-        for agency in pgdb.fetchall(f"SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info OFFSET 9 LIMIT 1"):
+        for agency in pgdb.fetchall(f"SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info"):
 
             # get list of feeds from transitland for agency
             r = requests.get(feed_url + agency[1], params={'api_key': api_key})
