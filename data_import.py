@@ -9,9 +9,6 @@ RELEASE HISTORY:
 
 -----------------------------------------------------------------------------"""
 
-# when parse error, keep feed data in transitland feeds, but scrap the other data 
-# make gtfs.tl_bad_feeds bad feeds table with JUST FILE ID
-
 # system imports
 import os
 import datetime as dt
@@ -47,15 +44,51 @@ cfgutil = None
 pgdb = None
 desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
 
-def error_handling(feed_id):
-    # in the case a warning was raised, truncate import tables
+
+# method for downloading a feed
+def download_feed(log, dl_link, path):
+    try:
+
+        response = requests.get(dl_link)
+        # Check if the request was successful (status code 200)
+        response.raise_for_status()
+        # Save the content to a local file
+        with open(path, 'wb') as file:
+            file.write(response.content)
+        log.info(f"Downloaded successfully: {path}")
+
+    except requests.exceptions.RequestException as e:
+
+        log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+
+
+# method for unzipping a feed
+def unzip_feed(log, zip, extracted):
+    try:
+
+        with zipfile.ZipFile(zip, 'r') as zip_ref:
+            zip_ref.extractall(extracted)
+        log.info(f"Unzipped successfully as: {extracted}")
+
+    except zipfile.BadZipFile as e:
+
+        log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+
+# method for truncating import tables in database
+def truncate_tables(pgdb):
         query = f'CALL truncate_temp_tables()'
         pgdb.query(query)
         pgdb.cnxn.commit()
-        query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
-        pgdb.query(query)
-        pgdb.cnxn.commit()
-        # Move on to the next CSV file
+
+
+# method for inserting bad feeds into bad feeds import table
+def insert_bad_feeds(pgdb, feed_id):
+    truncate_tables(pgdb)
+    query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
+    pgdb.query(query)
+    pgdb.cnxn.commit()
+
+
 
 
 def main():
@@ -155,20 +188,9 @@ def main():
                     feed_id = feed['id']
                     fetched_at_date = dt.datetime.strptime(feed['fetched_at'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
 
-                    # these are to get the april 2023 data
-                    # april_1_2023 = dt.date(2023, 4, 1)
-                    # april_30_2023 = dt.date(2023, 4, 30)
-                    # id_list = [44824 december 29 2019 - april 2020] chunk of the seattlechildrens data that has repeating data over a period of time
-                    # check if fetched_at date is > specified date (to only import newer feeds)
-                    # if january_1_2019 < fetched_at_date < january_1_2020:
-                    # if fetched_at_date > dt.date(2019, 10, 1):
-                    # if (feed_id in id_list) or (april_1_2023 <= fetched_at_date <= april_30_2023):
-
-                    # bad_feeds = [58406, 251143, 317910, 318000]  # 58406 more columns than column names, 251143 date attribute not in range 20222508
-
-
+                    bad_feeds = [58406, 251143, 317910, 318000]
                     # check if feed id > latest_id (to only import unimported feeds)
-                    if feed_id > agency[2]: 
+                    if feed_id > agency[2] or feed_id in bad_feeds: 
 
                         log.info(f'{agency[1]}, {feed_id}, {fetched_at_date}')
 
@@ -193,30 +215,10 @@ def main():
                         extracted_path = os.path.join(desktop_path, f"{feed_id}_extracted")
 
                         # Download the feed version
-                        try:
-
-                            response = requests.get(dl_url)
-                            # Check if the request was successful (status code 200)
-                            response.raise_for_status()
-                            # Save the content to a local file
-                            with open(zip_path, 'wb') as file:
-                                file.write(response.content)
-                            log.info(f"Downloaded successfully: {zip_path}")
-
-                        except requests.exceptions.RequestException as e:
-
-                            log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+                        download_feed(log, dl_url, zip_path)
 
                         # Unzip the downloaded file
-                        try:
-
-                            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                                zip_ref.extractall(extracted_path)
-                            log.info(f"Unzipped successfully as: {extracted_path}")
-
-                        except zipfile.BadZipFile as e:
-
-                            log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+                        unzip_feed(log, zip_path, extracted_path)
 
                         # List all files in the folder
                         file_list = os.listdir(extracted_path)
@@ -265,9 +267,9 @@ def main():
 
                                             df.drop(columns=df_extra_columns, inplace=True)
 
-                                        else:
+                                        # else:
 
-                                            log.info("No extra columns found in the DataFrame.")
+                                        #     log.info("No extra columns found in the DataFrame.")
 
                                         if sql_extra_columns:
                                             default_value = np.nan  # Adjust the default value based on your requirements
@@ -299,12 +301,7 @@ def main():
                             log.info(f"{Fore.RED}Error reading {file_name}: {str(w)}{Style.RESET_ALL}")
 
                             # in the case a warning was raised, truncate import tables
-                            query = f'CALL truncate_temp_tables()'
-                            pgdb.query(query)
-                            pgdb.cnxn.commit()
-                            query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
-                            pgdb.query(query)
-                            pgdb.cnxn.commit()
+                            insert_bad_feeds(pgdb, feed_id)
                             # Move on to the next CSV file
                             continue
 
@@ -321,11 +318,7 @@ def main():
                             log.info(f"{Fore.RED}Error reading {file_name}: {str(e)}{Style.RESET_ALL}")
 
                             # in the case a error was raised, truncate import tables
-                            query = f'CALL truncate_temp_tables()'
-                            pgdb.query(query)
-                            pgdb.cnxn.commit()
-                            query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
-                            pgdb.query(query)
+                            insert_bad_feeds(pgdb, feed_id)
                             query = f"CALL create_real_gtfs_bad_feeds_table()"
                             pgdb.query(query)
                             # Move on to the next CSV file
@@ -333,15 +326,10 @@ def main():
 
                         finally:
                             pgdb.cnxn.commit()
-                            query = f'CALL truncate_temp_tables()'
-                            pgdb.query(query)
-                            pgdb.cnxn.commit()
+                            truncate_tables(pgdb)
                             log.info('')
                             log.info('----- break -----')
                             log.info('')
-
-
-
 
     except Exception as e:
         #import pdb
@@ -354,6 +342,6 @@ def main():
         # close the log file with final message
         logutil.remove_file_log('---------- script completed ----------')
 
-    
+
 
 if __name__ == "__main__": main()
