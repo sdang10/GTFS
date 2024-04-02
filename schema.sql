@@ -1,8 +1,6 @@
 ---------------------------------------------------------------------------
 SELECT * FROM gtfs.v_transitland_feed_info;
 ---------------------------------------------------------------------------
--- NOTES:
-	-- SEATTLESHILDRENSHOSPITALSHUTTLE DATA STARTS AFTER APRIL 3rd 2020
 
 -- TEMP TABLES FOR A STRAIGHT FORWARD IMPORT
 
