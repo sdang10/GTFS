@@ -76,22 +76,24 @@ def unzip_feed(log, zip, extracted):
 
 # method for truncating import tables in database
 def truncate_tables(pgdb):
-        query = f'CALL truncate_temp_tables()'
-        pgdb.query(query)
+        pgdb.query('CALL truncate_temp_tables()')
         pgdb.cnxn.commit()
 
 
 # method for inserting bad feeds into bad feeds import table
 def insert_bad_feeds(pgdb, feed_id):
     truncate_tables(pgdb)
-    query = f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');"
-    pgdb.query(query)
+    pgdb.query(f"INSERT INTO gtfs.tl_bad_feeds VALUES('{feed_id}');")
     pgdb.cnxn.commit()
 
 
 
 
 def main():
+
+    # start time
+    start_time_stamp = dt.datetime.now()
+
     colorama.init()
     # setup catch on warnings for exception clauses
     warnings.filterwarnings("error")
@@ -134,6 +136,9 @@ def main():
     # file paths
     # zip_dl_url = cfgutil.get_item('feed_info','file_path')
     # archive_file_path = '/shane_gtfs_static_archive/'
+
+    # counter for feed processing
+    feed_count = 0
     
     try:
 
@@ -289,11 +294,16 @@ def main():
                                     
                                     else: 
                                 
-                                        # note extra text files in the extra files table 
-                                        sql_query = f"INSERT INTO gtfs_tl_extra_files VALUES ('{feed_id}', '{file}');"
-                                        pgdb.query(sql_query)
+                                        # note extra text files in the extra files table
+                                        pgdb.query(f"INSERT INTO gtfs_tl_extra_files VALUES ('{feed_id}', '{file}');")
                                         pgdb.cnxn.commit()
                                         log.info(f'Updated gtfs_extra_files with {feed_id} and {file}')
+
+                            # finished working through all files in zip - insert into db
+                            pgdb.query('CALL to_gtfs_tl_tables()')
+                            feed_count += 1
+
+                            # shutil.move(extracted_path, archive_file_path)
 
                         except Warning as w:
 
@@ -305,13 +315,6 @@ def main():
                             # Move on to the next CSV file
                             continue
 
-                        # shutil.move(extracted_path, archive_file_path)
-                            
-                        try: 
-
-                            query = f'CALL insert_into_real_tables()'
-                            pgdb.query(query)
-
                         except psycopg2.Error as e:
 
                             pgdb.cnxn.rollback()
@@ -319,8 +322,6 @@ def main():
 
                             # in the case a error was raised, truncate import tables
                             insert_bad_feeds(pgdb, feed_id)
-                            query = f"CALL create_real_gtfs_bad_feeds_table()"
-                            pgdb.query(query)
                             # Move on to the next CSV file
                             continue
 
@@ -328,7 +329,7 @@ def main():
                             pgdb.cnxn.commit()
                             truncate_tables(pgdb)
                             log.info('')
-                            log.info('----- break -----')
+                            log.info('---------- break ----------')
                             log.info('')
 
     except Exception as e:
@@ -338,6 +339,12 @@ def main():
         log.error(tb.format_exc())
 
     finally:
+        # calculate time interval
+        time_interval = str(dt.datetime.now() - start_time_stamp)
+
+        # writing final log messages into database
+        #pgdb.query(f"SELECT _log.f_write_message('info', 'import_orca_transactions', 'completed successfully', '{time_interval}'::interval)")
+        #pgdb.query(f"SELECT _log.f_write_table_update('gtfs.feeds', 'insert', {feed_count})")
         pgdb.close(True)
         # close the log file with final message
         logutil.remove_file_log('---------- script completed ----------')
