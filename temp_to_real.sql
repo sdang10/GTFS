@@ -6,7 +6,7 @@ AS $$
 BEGIN
 
     INSERT INTO gtfs.transitland_feeds (
-          id
+          feed_id
         , agency_id
         , fetched_at
         , earliest_calendar_date
@@ -50,20 +50,20 @@ $$;
 --$$;
 -- CALL _import.to_gtfs_tl_extra_attributes_table()
 
---CREATE OR REPLACE PROCEDURE _import.to_gtfs_tl_bad_feeds_table()
---LANGUAGE plpgsql
---AS $$
---BEGIN 
---    
---    INSERT INTO gtfs.tl_bad_feeds (
---        id
---    )
---    SELECT DISTINCT 
---        CAST(id AS INT)
---    FROM _import.gtfs_tl_bad_feeds;
---    
---END;
---$$;
+CREATE OR REPLACE PROCEDURE _import.to_gtfs_tl_bad_feeds_table()
+LANGUAGE plpgsql
+AS $$
+BEGIN 
+    
+    INSERT INTO gtfs.tl_bad_feeds (
+        feed_id
+    )
+    SELECT DISTINCT 
+        CAST(feed_id AS INT)
+    FROM _import.gtfs_tl_bad_feeds;
+    
+END;
+$$;
 -- CALL _import.to_gtfs_tl_bad_feeds_table()
 
 CREATE OR REPLACE PROCEDURE _import.to_gtfs_tl_extra_files_table()
@@ -1084,7 +1084,7 @@ BEGIN
     TRUNCATE TABLE _import.gtfs_tl_attributions;
     TRUNCATE TABLE _import.gtfs_tl_translations;
     TRUNCATE TABLE _import.gtfs_tl_extra_files;
-    TRUNCATE TABLE _import.gtfs_transitland_feeds;
+    TRUNCATE TABLE _import.gtfs_tl_feeds;
     TRUNCATE TABLE _import.gtfs_tl_bad_feeds;
     
 END; 
