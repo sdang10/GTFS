@@ -6,6 +6,7 @@ DESCRIPTION:  This script runs a data import of gtfs files from transitland to a
 
 RELEASE HISTORY:
   v  1.0    2024-03-18  initial code development (first bulk push to db)
+  v  1.1    2024-04-23  logging to database implemented
 
 -----------------------------------------------------------------------------"""
 
@@ -83,7 +84,7 @@ def truncate_tables(pgdb):
 # method for inserting bad feeds into bad feeds import table
 def insert_bad_feeds(pgdb, feed_id):
     truncate_tables(pgdb)
-    pgdb.query(f"INSERT INTO gtfs.tl_bad_feeds VALUES('{feed_id}');")
+    pgdb.query(f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');")
     pgdb.cnxn.commit()
 
 
@@ -193,9 +194,9 @@ def main():
                     feed_id = feed['id']
                     fetched_at_date = dt.datetime.strptime(feed['fetched_at'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
 
-                    bad_feeds = [58406, 251143, 317910, 318000]
+                    # bad_feeds = [58406, 251143, 317910, 318000]
                     # check if feed id > latest_id (to only import unimported feeds)
-                    if feed_id > agency[2] or feed_id in bad_feeds: 
+                    if feed_id > agency[2]: 
 
                         log.info(f'{agency[1]}, {feed_id}, {fetched_at_date}')
 
@@ -208,7 +209,7 @@ def main():
                         values_string = ', '.join(values)
 
                         # import the feed data into transitland_feeds table
-                        sql_query = f'INSERT INTO gtfs_transitland_feeds ({columns_string}) VALUES ({values_string})'
+                        sql_query = f'INSERT INTO gtfs_tl_feeds ({columns_string}) VALUES ({values_string})'
                         pgdb.query(sql_query)
                         pgdb.cnxn.commit()
 
@@ -326,7 +327,7 @@ def main():
                             continue
 
                         finally:
-                            pgdb.cnxn.commit()
+                            pgdb.cnxn.commit() 
                             truncate_tables(pgdb)
                             log.info('')
                             log.info('---------- break ----------')
