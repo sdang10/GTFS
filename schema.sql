@@ -36,7 +36,7 @@ SELECT * FROM gtfs.v_transitland_feed_info;
 --DROP TABLE _import.gtfs_tl_translations;
 
 
-CREATE TABLE _import.gtfs_transitland_feeds (
+CREATE TABLE _import.gtfs_tl_feeds (
       id TEXT
     , agency_id TEXT
     , fetched_at TEXT
@@ -44,6 +44,10 @@ CREATE TABLE _import.gtfs_transitland_feeds (
     , latest_calendar_date TEXT
     , sha1 TEXT
     , url TEXT
+);
+
+CREATE TABLE _import.gtfs_tl_bad_feeds (
+      feed_id TEXT
 );
 
 --CREATE TABLE _import.gtfs_extra_attributes (
@@ -672,8 +676,8 @@ INSERT INTO gtfs.e_is_role VALUES
 -- SELECT * FROM gtfs.real_gtfs_extra_attributes 
 
 CREATE TABLE gtfs.tl_bad_feeds (
-      id INT NOT NULL
-    , PRIMARY KEY(id)
+      feed_id INT NOT NULL
+    , PRIMARY KEY(feed_id)
 );
 -- SELECT * FROM _import.gtfs_tl_bad_feeds
 -- SELECT * FROM gtfs.tl_bad_feeds
