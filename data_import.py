@@ -43,10 +43,10 @@ log = None
 logutil = None
 cfgutil = None
 pgdb = None
-desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
+save_path = os.path.join(os.path.expanduser('~'), 'Desktop')
 
 
-# method for downloading a feed
+# downloading a feed
 def download_feed(log, dl_link, path):
     try:
 
@@ -63,7 +63,7 @@ def download_feed(log, dl_link, path):
         log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
 
 
-# method for unzipping a feed
+# unzipping a feed
 def unzip_feed(log, zip, extracted):
     try:
 
@@ -75,16 +75,16 @@ def unzip_feed(log, zip, extracted):
 
         log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
 
-# method for truncating import tables in database
-def truncate_tables(pgdb):
-        pgdb.query('CALL truncate_temp_tables()')
-        pgdb.cnxn.commit()
+# truncating import tables in database
+# def truncate_tables(pgdb):
+#         pgdb.query('CALL gtfs.p_truncate_import_tables()')
+#         pgdb.cnxn.commit()
 
 
-# method for inserting bad feeds into bad feeds import table
+# inserting bad feeds into bad feeds table
 def insert_bad_feeds(pgdb, feed_id):
-    truncate_tables(pgdb)
-    pgdb.query(f"INSERT INTO gtfs_tl_bad_feeds VALUES('{feed_id}');")
+    # truncate_tables(pgdb)
+    pgdb.query(f"CALL gtfs.p_insert_bad_feed('{feed_id}');")
     pgdb.cnxn.commit()
 
 
@@ -217,14 +217,15 @@ def main():
                         dl_url = urljoin(download_url.replace('{feed_version_key}', str(feed['sha1'])), f"?api_key={api_key}")
 
                         # Set file paths
-                        zip_path = os.path.join(desktop_path, f"{feed_id}.zip")
-                        extracted_path = os.path.join(desktop_path, f"{feed_id}_extracted")
+                        zip_path = os.path.join(save_path, f"{feed_id}.zip")
+                        extracted_path = os.path.join(save_path, f"{feed_id}_extracted")
 
                         # Download the feed version
                         download_feed(log, dl_url, zip_path)
 
                         # Unzip the downloaded file
                         unzip_feed(log, zip_path, extracted_path)
+
 
                         # List all files in the folder
                         file_list = os.listdir(extracted_path)
@@ -301,34 +302,26 @@ def main():
                                         log.info(f'Updated gtfs_extra_files with {feed_id} and {file}')
 
                             # finished working through all files in zip - insert into db
-                            pgdb.query('CALL to_gtfs_tl_tables()')
+                            pgdb.query('CALL gtfs.p_import_gtfs_transitland()')
                             feed_count += 1
 
                             # shutil.move(extracted_path, archive_file_path)
 
-                        except Warning as w:
-
-                            # log error message
-                            log.info(f"{Fore.RED}Error reading {file_name}: {str(w)}{Style.RESET_ALL}")
-
-                            # in the case a warning was raised, truncate import tables
-                            insert_bad_feeds(pgdb, feed_id)
-                            # Move on to the next CSV file
-                            continue
-
-                        except psycopg2.Error as e:
+                        # if there are more values than columns or if we have primary key issues
+                        except (Warning, psycopg2.Error) as e:
 
                             pgdb.cnxn.rollback()
                             log.info(f"{Fore.RED}Error reading {file_name}: {str(e)}{Style.RESET_ALL}")
 
                             # in the case a error was raised, truncate import tables
-                            insert_bad_feeds(pgdb, feed_id)
+                            pgdb.query(f"CALL gtfs.p_insert_bad_feed('{feed_id}');")
+                            # pgdb.cnxn.commit()
                             # Move on to the next CSV file
                             continue
 
                         finally:
                             pgdb.cnxn.commit() 
-                            truncate_tables(pgdb)
+                            # truncate_tables(pgdb) # called from sql procedure
                             log.info('')
                             log.info('---------- break ----------')
                             log.info('')
