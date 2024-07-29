@@ -1,39 +1,48 @@
 #! /usr/bin/env python3
 """-----------------------------------------------------------------------------
-SCRIPT: shane_gtfs_static.py
+SCRIPT: etl_gtfs_transitland.py
 AUTHOR: Shane Khaykham Dang <dangit17@uw.edu>
-DESCRIPTION:  This script runs a data import of gtfs files from transitland to a database in postgres
+DESCRIPTION:  This script runs a data import of gtfs files from transitland 
+                to a defined database in postgres
+
+DEPENDENCIES:
+    requests
+    psycopg2
+    numpy
+    pandas
+    sqlalchemy
+
+TODO:
+    switch to only use sqlalchemy; drop dependency on psycopg2
+    allow import of single file if given switch (requires refactor of some code)
+    check if file has already been downloaded prior to fetching from url
 
 RELEASE HISTORY:
-  v  1.0    2024-03-18  initial code development (first bulk push to db)
-  v  1.1    2024-04-23  logging to database implemented
+  v  0.8    2024-07-03  final testing
+  v  0.6    2024-04-23  logging to database implemented
+  v  0.5    2024-03-18  initial code development (first bulk push to db)
 
 -----------------------------------------------------------------------------"""
 
+# import bundled modules
+import argparse, datetime as dt, os, shutil, sys, warnings, zipfile  # distutils.util, glob, math
+
 # system imports
-import os
-import datetime as dt
-import zipfile
-import argparse
-import sys
-import warnings
 from urllib.parse import urljoin
-import numpy as np
-import pandas as pd
-from sqlalchemy import create_engine, text
-import colorama
-from colorama import Fore, Style
-# import json
-# import shutil
 
 # external module imports
 import requests
 import psycopg2
+import numpy as np
+import pandas as pd
+from sqlalchemy import create_engine, text
+#import colorama
+#from colorama import Fore, Style
 
 # import class definitions
-from shane_pyutils.logutil import LogUtil
-from shane_pyutils.cfgutil import ConfigUtil
-from shane_pyutils.dbutil import PostgresDB
+from pyutils.logutil import LogUtil
+from pyutils.cfgutil import ConfigUtil
+from pyutils.dbutil import PostgresDB
 
 # only use python 3.6 or higher due to f-strings
 assert sys.version_info >= (3,6)
@@ -43,7 +52,7 @@ log = None
 logutil = None
 cfgutil = None
 pgdb = None
-save_path = os.path.join(os.path.expanduser('~'), 'Desktop')
+#save_path = '/opt/gtfs_transitland/'
 
 
 # downloading a feed
@@ -60,7 +69,8 @@ def download_feed(log, dl_link, path):
 
     except requests.exceptions.RequestException as e:
 
-        log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+        #log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+        log.info(f"Error: {e}")
 
 
 # unzipping a feed
@@ -73,7 +83,8 @@ def unzip_feed(log, zip, extracted):
 
     except zipfile.BadZipFile as e:
 
-        log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+        #log.info(f"{Fore.Red}Error: {e}{Style.RESET_ALL}")
+        log.info(f"Error: {e}")
 
 # truncating import tables in database
 # def truncate_tables(pgdb):
@@ -88,14 +99,12 @@ def insert_bad_feeds(pgdb, feed_id):
     pgdb.cnxn.commit()
 
 
-
-
 def main():
 
     # start time
     start_time_stamp = dt.datetime.now()
 
-    colorama.init()
+    #colorama.init()
     # setup catch on warnings for exception clauses
     warnings.filterwarnings("error")
 
@@ -161,6 +170,11 @@ def main():
         # perform all other checks without exiting first so we can check for all errors
         xit = False
 
+        # check that output path exists:
+        if not os.path.isdir(args.output_dir):
+            log.error(f'path {args.output_dir} does not exist; exiting')
+            xit = True
+        
         # verify that tables exist in pgdb
         # for t in ['gtfs_stops']:
         #     if not pgdb.table_exists(t, pg_schema):
@@ -176,6 +190,13 @@ def main():
         log.info('---------- desc ----------')
         # iterate over each agency - get agency id (0) feed endpoints (1) and latest id (2) from database
         for agency in pgdb.fetchall(f"SELECT agency_id, feed_onestop_id, latest_id FROM gtfs.v_transitland_feed_info"):
+
+            # set zip path to start with folder for agency
+            save_path = os.path.join(args.output_dir, f'{agency[0]}')
+
+            # ensure directory exists
+            if not os.path.isdir(save_path):
+                os.mkdir(save_path)
 
             # get list of feeds from transitland for agency
             r = requests.get(feed_url + agency[1], params={'api_key': api_key})
@@ -196,9 +217,13 @@ def main():
 
                     # bad_feeds = [58406, 251143, 317910, 318000]
                     # check if feed id > latest_id (to only import unimported feeds)
-                    if feed_id > agency[2]: 
+                    #if feed_id == 36311:      # use to look at an individual file
+                    if feed_id > agency[2]:     # process all files after latest in database
 
                         log.info(f'{agency[1]}, {feed_id}, {fetched_at_date}')
+                            
+                        # first ensure import tables are clear
+                        #pgdb.query(f"CALL gtfs.p_truncate_import_gtfs_tables();")
 
                         # retrieve feed data in list format for columns and values in feed table
                         columns = list(feed.keys())
@@ -211,14 +236,15 @@ def main():
                         # import the feed data into transitland_feeds table
                         sql_query = f'INSERT INTO gtfs_tl_feeds ({columns_string}) VALUES ({values_string})'
                         pgdb.query(sql_query)
+                        # commit this since we want it in database even for bad feed, when next transaction is rolled back
                         pgdb.cnxn.commit()
 
                         # Construct download URL
                         dl_url = urljoin(download_url.replace('{feed_version_key}', str(feed['sha1'])), f"?api_key={api_key}")
 
                         # Set file paths
-                        zip_path = os.path.join(save_path, f"{feed_id}.zip")
-                        extracted_path = os.path.join(save_path, f"{feed_id}_extracted")
+                        extracted_path = os.path.join(save_path, f'{feed_id}')
+                        zip_path = os.path.join(save_path, f'{feed_id}.zip')
 
                         # Download the feed version
                         download_feed(log, dl_url, zip_path)
@@ -232,7 +258,6 @@ def main():
 
                         # if we encounter a warning, abort this feed and move on to the next one
                         try:
-
                             # Iterate through each file in the folder
                             for file in file_list:
 
@@ -298,7 +323,7 @@ def main():
                                 
                                         # note extra text files in the extra files table
                                         pgdb.query(f"INSERT INTO gtfs_tl_extra_files VALUES ('{feed_id}', '{file}');")
-                                        pgdb.cnxn.commit()
+                                        #pgdb.cnxn.commit()
                                         log.info(f'Updated gtfs_extra_files with {feed_id} and {file}')
 
                             # finished working through all files in zip - insert into db
@@ -311,7 +336,8 @@ def main():
                         except (Warning, psycopg2.Error) as e:
 
                             pgdb.cnxn.rollback()
-                            log.info(f"{Fore.RED}Error reading {file_name}: {str(e)}{Style.RESET_ALL}")
+                            #log.info(f"{Fore.RED}Error reading {file_name}: {str(e)}{Style.RESET_ALL}")
+                            log.info(f"Error reading {file_name}: {str(e)}")
 
                             # in the case a error was raised, truncate import tables
                             pgdb.query(f"CALL gtfs.p_insert_bad_feed('{feed_id}');")
@@ -320,11 +346,21 @@ def main():
                             continue
 
                         finally:
-                            pgdb.cnxn.commit() 
+                            # check if feed is not in final table, something must have failed
+                            if not pgdb.fetchone(f'SELECT gtfs.f_feed_exists({feed_id})'):
+                                # truncate tables and completely exit
+                                pgdb.query(f"CALL gtfs.p_truncate_import_gtfs_tables();")
+                                pgdb.cnxn.commit() 
+                                sys.exit()
+
+                            pgdb.cnxn.commit()
                             # truncate_tables(pgdb) # called from sql procedure
                             log.info('')
                             log.info('---------- break ----------')
                             log.info('')
+
+                            # delete extracted zip file
+                            shutil.rmtree(extracted_path)
 
     except Exception as e:
         #import pdb
