@@ -1,6 +1,6 @@
 # GTFS ETL Pipeline
 
-The purpose of this code base is to create an ETL pipeline from [General Transit Feed Specification (GTFS)](https://gtfs.org/). 
+The purpose of this code base is to create an ETL pipeline from [General Transit Feed Specification (GTFS)](https://gtfs.org/) to a SQL database. 
 
 The process in this pipeline involves the following components:
 1) Create a Luigi Task, CreateDbFromCsv, that creates a new database and fills it with data from the sample dataset 
