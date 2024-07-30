@@ -1,6 +1,8 @@
-/**********************************************************/
-/******************** GTFS DATA PROCESSING ****************/
-/**********************************************************/
+------------------------------------------------------------
+-- file: processing.sql
+-- author: Shane K. Dang <dangit17@uw.edu>
+-- description: gtfs data processing
+------------------------------------------------------------
 
 -- procedure to truncate import gtfs tables
 CREATE OR REPLACE PROCEDURE gtfs.p_truncate_import_gtfs_tables()
