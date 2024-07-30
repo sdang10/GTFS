@@ -1,7 +1,7 @@
 ------------------------------------------------------------
 -- file: schema.sql
 -- author: Shane K. Dang <dangit17@uw.edu>
--- description: gtfs data tables and processing
+-- description: gtfs data schema tables
 ------------------------------------------------------------
 
 -- GTFS spec: https://gtfs.org/schedule/reference/
