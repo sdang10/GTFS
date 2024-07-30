@@ -1,5 +1,5 @@
 ------------------------------------------------------------
--- file: schema.sql
+-- file: schema_tables.sql
 -- author: Shane K. Dang <dangit17@uw.edu>
 -- description: gtfs data schema tables
 ------------------------------------------------------------
